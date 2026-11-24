@@ -288,6 +288,14 @@ def main():
         ("0x004A1732", 0x004A1732, "Misc.cpp", "return_addr_4D7814", True),
         ("0x004A1738", 0x004A1738, "Misc.cpp", "read_global_4D7820", True),
         ("0x004A173E", 0x004A173E, "Misc.cpp", "read_global_4D7824", True),
+        ("0x004176E0", 0x004176E0, "FieldWriter.cpp", "set_34", True),
+        ("0x00428090", 0x00428090, "FieldWriter.cpp", "set_28", True),
+        ("0x004280C0", 0x004280C0, "FieldWriter.cpp", "set_2C", True),
+        ("0x00433BA0", 0x00433BA0, "FieldWriter.cpp", "set_04", True),
+        ("0x00433BB0", 0x00433BB0, "FieldWriter.cpp", "set_08", True),
+        ("0x004340A0", 0x004340A0, "FieldWriter.cpp", "set_278", True),
+        ("0x00440840", 0x00440840, "FieldWriter.cpp", "set_3C", True),
+        ("0x00433B00", 0x00433B00, "FieldWriter.cpp", "set_1030_byte", True),
     ]
 
     for label, va, src_name, fn_name, need_this, *rest in targets:
