@@ -265,6 +265,16 @@ def main():
         ("0x004341D0", 0x004341D0, "SseAccess.cpp", "store_6C", True),
         ("0x004341E0", 0x004341E0, "SseAccess.cpp", "store_74", True),
         ("0x004341F0", 0x004341F0, "SseAccess.cpp", "store_78", True),
+        ("0x0045C9E0", 0x0045C9E0, "Misc.cpp", "return_579C70", True),
+        ("0x00490556", 0x00490556, "Misc.cpp", "return_4000", True),
+        ("0x004905C1", 0x004905C1, "Misc.cpp", "return_57A3A4", True),
+        ("0x004905C7", 0x004905C7, "Misc.cpp", "return_57A3A0", True),
+        ("0x0049056E", 0x0049056E, "Misc.cpp", "return_true", True),
+        ("0x004407F0", 0x004407F0, "Misc.cpp", "clear_3C", True),
+        ("0x00440B40", 0x00440B40, "Misc.cpp", "clear_50", True),
+        ("0x00433DE0", 0x00433DE0, "Misc.cpp", "set_bit_6368", True),
+        ("0x0049EBDE", 0x0049EBDE, "Misc.cpp", "read_global_4D74F8", True),
+        ("0x00490463", 0x00490463, "Misc.cpp", "zero_global_4D72F4", True),
     ]
 
     for label, va, src_name, fn_name, need_this, *rest in targets:
