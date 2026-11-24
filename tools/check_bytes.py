@@ -227,27 +227,11 @@ def main():
         ("0x00404B60", 0x00404B60, "FieldAccess.cpp", "read_first_as_m128", True),
         ("0x00405A60", 0x00405A60, "FieldAccess.cpp", "read_44_as_m128", True),
         ("0x0041C710", 0x0041C710, "FieldAccess.cpp", "mul_74_x_54", True),
-        ("0x00406730", 0x00406730, "FieldAccess.cpp", "get_field_24", True),
-        ("0x004176D0", 0x004176D0, "FieldAccess.cpp", "get_field_20", True),
-        ("0x00429A50", 0x00429A50, "FieldAccess.cpp", "addr_of_1C", True),
-        ("0x00407E30", 0x00407E30, "FieldAccess.cpp", "addr_of_620", True),
-        ("0x00424480", 0x00424480, "FieldAccess.cpp", "clear_field_28", True),
         ("0x00404BD0", 0x00404BD0, "FieldAccess.cpp", "return_const_addr", True),
         ("0x00429AB0", 0x00429AB0, "FieldAccess.cpp", "clear_low_nibble_at_40", True),
-        ("0x0040A090", 0x0040A090, "FieldAccess.cpp", "addr_of_1274", True),
-        ("0x00417770", 0x00417770, "FieldAccess.cpp", "get_field_34", True),
         ("0x00433B90", 0x00433B90, "FieldAccess.cpp", "get_field_04", True),
-        ("0x00433DC0", 0x00433DC0, "FieldAccess.cpp", "addr_of_44", True),
-        ("0x00431300", 0x00431300, "FieldAccess.cpp", "get_field_50", True),
-        ("0x00431260", 0x00431260, "FieldAccess.cpp", "get_field_19260", True),
-        ("0x0040A0E0", 0x0040A0E0, "FieldAccess.cpp", "get_field_47FAC", True),
         # ★ 这个函数需要 /Os（生成 pop ecx 而非 add esp,4）
         ("0x0048F711", 0x0048F711, "FieldAccess.cpp", "forward_to_cpu_probe", False, "/MT /Os /GS- /Oy-"),
-        ("0x0041FA30", 0x0041FA30, "FieldAccess.cpp", "get_field_1C_int", True),
-        ("0x00433B40", 0x00433B40, "FieldAccess.cpp", "get_field_00", True),
-        ("0x00441210", 0x00441210, "FieldAccess.cpp", "get_field_3C", True),
-        ("0x00433DD0", 0x00433DD0, "FieldAccess.cpp", "addr_of_4FF4", True),
-        ("0x00433DF0", 0x00433DF0, "FieldAccess.cpp", "addr_of_1230", True),
         ("0x00429A40", 0x00429A40, "SseAccess.cpp", "load_18", True),
         ("0x00441240", 0x00441240, "SseAccess.cpp", "load_28", True),
         ("0x00441250", 0x00441250, "SseAccess.cpp", "load_2C", True),
@@ -371,6 +355,13 @@ def main():
                     s = ln.strip()
                     if s.startswith("constexpr") or s.startswith("static const"):
                         prefix += ln + "\n"
+                    # ★ 2026-11-24 补：extern 变量声明也要带进来
+                    #
+                    # Misc.cpp 用 `extern unsigned g_at_4D74F8;` 声明全局变量，
+                    # 定义在 .cpp 里。只提取 constexpr 会导致该变量未声明 →
+                    # COMPILE_ERROR。
+                    elif s.startswith("extern ") and s.endswith(";"):
+                        prefix += ln + "\n"
 
         # 抠出所有 namespace { ... } 块（辅助定义）
         depth = 0
@@ -425,6 +416,31 @@ def main():
 
         if sys_includes:
             body = "\n".join(sys_includes) + "\n" + body
+
+        # ★ 成员函数（`Cls::name`）需要 struct 定义
+        #
+        # 如果提取出的函数体里有 `::`，说明是成员函数，
+        # 必须把 hpp 里的 struct/class 定义一并带进来，否则编译不过。
+        # ★ 判据必须严格：只认「标识符::标识符(」这种成员函数签名，
+        # 不能只看有没有 "::" —— Misc.cpp 的函数体里含 "th185::misc::" 命名空间，
+        # 会被误判成成员函数，把整个 hpp 拼进来导致编译错误。
+        import re as _re3
+        # ★ 判据：只看**函数定义行**是否形如 `Ret Cls::name(`。
+        # 不能扫整个 body —— Misc.cpp 里 `return th185::misc::g_v;` 也含 `::`，
+        # 会被误判，把整个 hpp 拼进来导致编译错误。
+        is_member = _re3.search(
+            r"\b[A-Za-z_]\w*::[A-Za-z_]\w*\s*\("
+            , func_text.split("\n")[0]) is not None
+        if is_member and hpp_for_inc and os.path.isfile(hpp_for_inc):
+            with open(hpp_for_inc, encoding="utf-8") as fh:
+                hpp_text = fh.read()
+            decl_lines = []
+            for ln in hpp_text.split("\n"):
+                s2 = ln.strip()
+                if s2.startswith("#pragma") or s2.startswith("#include"):
+                    continue
+                decl_lines.append(ln)
+            body = "\n".join(decl_lines) + "\n" + body
 
         use_flags = (extra_flags.split() if extra_flags else flags)
         with tempfile.TemporaryDirectory() as td:
