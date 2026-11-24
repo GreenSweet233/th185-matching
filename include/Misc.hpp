@@ -14,6 +14,8 @@ namespace th185 {
 extern unsigned g_at_4D74F8;
 extern unsigned g_at_4D72F4;
 extern void* g_p_kitchen;
+extern unsigned g_at_4D7820;
+extern unsigned g_at_4D7824;
 namespace misc {
 
 // ---- 返回常量 / 常量地址 ----
@@ -42,6 +44,14 @@ __m128 __fastcall mul_78_x_58(void* self, void* unused_edx);
 void __fastcall set_534_and_store_44(void* self, __m128 ignored, __m128 v);
 void __fastcall store_44_via_global(void* self, __m128 ignored, __m128 v);
 void* __fastcall load_via_global(void* self, void* unused_edx);
+
+// ---- 第 10 批 ----
+void* __fastcall return_addr_4D750C(void* self, void* unused_edx);
+void* __fastcall return_addr_4D7818(void* self, void* unused_edx);
+void* __fastcall return_addr_4D781C(void* self, void* unused_edx);
+void* __fastcall return_addr_4D7814(void* self, void* unused_edx);
+unsigned __fastcall read_global_4D7820(void* self, void* unused_edx);
+unsigned __fastcall read_global_4D7824(void* self, void* unused_edx);
 
 }  // namespace misc
 }  // namespace th185

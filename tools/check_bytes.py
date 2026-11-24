@@ -282,6 +282,12 @@ def main():
         ("0x0048AC40", 0x0048AC40, "Misc.cpp", "set_534_and_store_44", True),
         ("0x00433820", 0x00433820, "Misc.cpp", "store_44_via_global", True),
         ("0x00433850", 0x00433850, "Misc.cpp", "load_via_global", True),
+        ("0x0049EEBB", 0x0049EEBB, "Misc.cpp", "return_addr_4D750C", True),
+        ("0x004A1726", 0x004A1726, "Misc.cpp", "return_addr_4D7818", True),
+        ("0x004A172C", 0x004A172C, "Misc.cpp", "return_addr_4D781C", True),
+        ("0x004A1732", 0x004A1732, "Misc.cpp", "return_addr_4D7814", True),
+        ("0x004A1738", 0x004A1738, "Misc.cpp", "read_global_4D7820", True),
+        ("0x004A173E", 0x004A173E, "Misc.cpp", "read_global_4D7824", True),
     ]
 
     for label, va, src_name, fn_name, need_this, *rest in targets:

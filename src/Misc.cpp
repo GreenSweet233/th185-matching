@@ -13,6 +13,9 @@ unsigned g_at_4D72F4 = 0;
 // 地址由二进制见证给出，实际布局由链接器决定。
 void* g_p_kitchen = nullptr;
 
+unsigned g_at_4D7820 = 0;
+unsigned g_at_4D7824 = 0;
+
 namespace {
 // 取 +offset 处的 float 地址。★ 必须是宏（inline/template 会生成 add 而非 disp8）。
 #define FLOAT_AT(self, offset) \
@@ -174,6 +177,55 @@ void* __fastcall load_via_global(void* self, void* unused_edx) {
     (void)unused_edx;
     return *reinterpret_cast<void**>(
         static_cast<char*>(g_p_kitchen) + 0xE6BB2C);
+}
+
+// ===========================================================================
+// 第 10 批：返回常量地址 / 全局读取
+// ===========================================================================
+
+// --- 返回常量地址（4 个）---
+// 字节: b8 XXXXXXXX c3 = mov eax,imm32 ; ret
+//@witness func=0x0049EEBB kind=thiscall
+void* __fastcall return_addr_4D750C(void* self, void* unused_edx) {
+    (void)self;
+    (void)unused_edx;
+    return reinterpret_cast<void*>(0x004D750Cu);
+}
+
+//@witness func=0x004A1726 kind=thiscall
+void* __fastcall return_addr_4D7818(void* self, void* unused_edx) {
+    (void)self;
+    (void)unused_edx;
+    return reinterpret_cast<void*>(0x004D7818u);
+}
+
+//@witness func=0x004A172C kind=thiscall
+void* __fastcall return_addr_4D781C(void* self, void* unused_edx) {
+    (void)self;
+    (void)unused_edx;
+    return reinterpret_cast<void*>(0x004D781Cu);
+}
+
+//@witness func=0x004A1732 kind=thiscall
+void* __fastcall return_addr_4D7814(void* self, void* unused_edx) {
+    (void)self;
+    (void)unused_edx;
+    return reinterpret_cast<void*>(0x004D7814u);
+}
+
+// --- 全局读取（2 个，a1 = mov eax,ds:[addr]，需 relocation）---
+//@witness func=0x004A1738 kind=thiscall
+unsigned __fastcall read_global_4D7820(void* self, void* unused_edx) {
+    (void)self;
+    (void)unused_edx;
+    return g_at_4D7820;
+}
+
+//@witness func=0x004A173E kind=thiscall
+unsigned __fastcall read_global_4D7824(void* self, void* unused_edx) {
+    (void)self;
+    (void)unused_edx;
+    return g_at_4D7824;
 }
 
 }  // namespace misc
