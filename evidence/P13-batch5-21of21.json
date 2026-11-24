@@ -1,0 +1,182 @@
+{
+  "id": "P13-batch5-21of21",
+  "date": "2026-11-24",
+  "gate": "P1 byte-level match",
+  "summary": {
+    "before": {
+      "targets": 156,
+      "matched": 131,
+      "diff": 25
+    },
+    "after": {
+      "targets": 177,
+      "matched": 152,
+      "diff": 25
+    },
+    "added": 21,
+    "added_passed": 21,
+    "added_failed": 0,
+    "regression": false,
+    "_note": "25 个 DIFF 的地址集合前后完全一致 —— 无新增失败、无既有匹配退化。"
+  },
+  "method": {
+    "discovery": "对 1472 个未声明函数做两轮聚类：(a) 精确字节分组；(b) 仅按 mnemonic 序列分组（忽略操作数），得到 86 个 >=2 成员的族、共 232 个函数。再取族内指令数 <= 12 的小函数逐个读反汇编。",
+    "selection": "只取能一眼看出语义的族（通知桩/转发/构造函数/全局指针写入/三参写入）。每个候选先用 tools/check_bytes.py 的 compile_cpp 单点快跑。",
+    "verification": "最终数字全部来自 `python tools/check_bytes.py` 输出。"
+  },
+  "new_functions": [
+    {
+      "va": "0x004A23A7",
+      "bytes": "6a06e88501000059c3",
+      "shape": "notify stub",
+      "arg": "6"
+    },
+    {
+      "va": "0x004A417D",
+      "bytes": "6a01e8a7feffff59c3",
+      "shape": "notify stub",
+      "arg": "1"
+    },
+    {
+      "va": "0x004A6B75",
+      "bytes": "6a08e8b7b9ffff59c3",
+      "shape": "notify stub",
+      "arg": "8"
+    },
+    {
+      "va": "0x004A0C5F",
+      "bytes": "6824214b006820214b006824214b006a00e81901000083c410c3",
+      "shape": "4-arg register",
+      "args": "(0, 4B2124, 4B2120, 4B2124)"
+    },
+    {
+      "va": "0x004A0C79",
+      "bytes": "683c214b006834214b00683c214b006a01e8ff00000083c410c3",
+      "shape": "4-arg register",
+      "args": "(1, 4B213C, 4B2134, 4B213C)"
+    },
+    {
+      "va": "0x004A0C93",
+      "bytes": "687c214b006874214b00687c214b006a14e8e500000083c410c3",
+      "shape": "4-arg register",
+      "args": "(0x14, 4B217C, 4B2174, 4B217C)"
+    },
+    {
+      "va": "0x004A0CAD",
+      "bytes": "6894214b00688c214b006894214b006a16e8cb00000083c410c3",
+      "shape": "4-arg register",
+      "args": "(0x16, 4B2194, 4B218C, 4B2194)"
+    },
+    {
+      "va": "0x0049DEDF",
+      "bytes": "6a016a026a00e8aafeffff83c40cc3",
+      "shape": "3-arg forward",
+      "args": "(0, 2, 1)"
+    },
+    {
+      "va": "0x0049DEEE",
+      "bytes": "6a016a00e89bfeffff83c40cc3",
+      "shape": "3-arg forward",
+      "args": "(0, 0, 1)"
+    },
+    {
+      "va": "0x00429BF0",
+      "bytes": "5668600400008bf16a0056e86077060083c40c8bc65ec3",
+      "shape": "constructor",
+      "size": "0x460"
+    },
+    {
+      "va": "0x00434200",
+      "bytes": "5668600400008bf16a0056e850d1050083c40c8bc65ec3",
+      "shape": "constructor",
+      "size": "0x460"
+    },
+    {
+      "va": "0x00434280",
+      "bytes": "56685c0400008bf16a0056e8d0d0050083c40c8bc65ec3",
+      "shape": "constructor",
+      "size": "0x45C"
+    },
+    {
+      "va": "0x00433830",
+      "bytes": "558beca1147c4d008b4d0889882cbbe6005dc20400",
+      "shape": "global-ptr store (thiscall)",
+      "disp": "0xE6BB2C"
+    },
+    {
+      "va": "0x00434060",
+      "bytes": "558beca1f47a4d008b4d0889888c0000005dc20400",
+      "shape": "global-ptr store (thiscall)",
+      "disp": "0x8C"
+    },
+    {
+      "va": "0x00492832",
+      "bytes": "558bec8b45088b4d108948085dc3",
+      "shape": "3-arg store",
+      "note": "第2参不用但必须保留"
+    },
+    {
+      "va": "0x00430710",
+      "bytes": "f30f110de00f4d00c3",
+      "shape": "global float store"
+    },
+    {
+      "va": "0x00434270",
+      "bytes": "f30f1189b4070000c3",
+      "shape": "field float store",
+      "field": "+0x7B4"
+    },
+    {
+      "va": "0x00433B90",
+      "bytes": "8b4104c3",
+      "shape": "field getter",
+      "field": "+0x04"
+    },
+    {
+      "va": "0x004410E0",
+      "bytes": "c781a400000000000000c20400",
+      "shape": "field clear (thiscall)",
+      "field": "+0xA4"
+    },
+    {
+      "va": "0x00433BD0",
+      "bytes": "558bec8b45088b550c8914815dc20800",
+      "shape": "array element store",
+      "field": "[+0x00]"
+    },
+    {
+      "va": "0x0049F0F1",
+      "bytes": "e83a0b000085c07506b8988a4c00c383c014c3",
+      "shape": "pointer pick + fallback"
+    }
+  ],
+  "rules_learned": [
+    "cdecl 实参顺序必须从 push 顺序反推：最先压栈的是最后一个形参。0x004A0C5F 的 push 0x4B2124/0x4B2020/0x4B2124/0 => 形参 (int, ptr, ptr, ptr)。写成 (ptr,ptr,ptr,int) 会得到相同长度 26 字节但全部错位 —— 长度检查抓不到，必须逐字节比。",
+    "三参写入时第 2 个形参必须保留（即使不用），否则第 3 个实参落到 [ebp+0xC] 而不是 [ebp+0x10]，差 1 字节。",
+    "全局指针写入必须是 thiscall（ret 4）；写成自由函数会变成 ret，字节不符。",
+    "被 extern 引用的声明必须放全局作用域：check_bytes.py 把 hpp 里 `extern ...;` 行原样提到 TU 最前面（全局作用域）。放 namespace 内会 C2065。该行还须以 ';' 结尾、文档注释另起一行。"
+  ],
+  "negative_results": {
+    "_title": "同族但不可得的 4 个",
+    "addresses": [
+      "0x0049D72A",
+      "0x004A7C50",
+      "0x0049DEFD",
+      "0x0049DF39"
+    ],
+    "reason": "形状与本批函数相同，只多一个 8bff（mov edi,edi）hotpatch 前缀。实测 24 种 flags 组合（/O1 /O2 /Od × /Oy- /Oy × /hotpatch × /Gy）：以 8bff 开头 0 个，以 6690 开头 8 个（全部 /hotpatch 组合）。",
+    "action": "不写入 src/（宁可 unmatched，不可 garbage match）"
+  },
+  "toolchain_notes": {
+    "no_tool_changes": "本批未修改任何 tools/ 下的文件。"
+  },
+  "gates_after": {
+    "G1": "PASS (95 definitions, 0 conflicts)",
+    "G3": "PASS (177 functions, 0 failures)",
+    "G4": "PASS (0 violations, 0 parse errors; clang-format UNAVAILABLE)",
+    "G2+": "PASS (51/51)",
+    "G2": "INCOMPLETE 10.5672% (177/1675)",
+    "G5": "INCOMPLETE",
+    "G6": "INCOMPLETE"
+  }
+}

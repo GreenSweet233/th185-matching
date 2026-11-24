@@ -1,6 +1,6 @@
 {
   "_comment": "AGENTS.md §11 仪表盘。人类唯一审查对象。禁止粉饰。",
-  "updated_at": "2026-11-24T21:55:00",
+  "updated_at": "2026-11-24T14:39:12",
   "phase": "bootstrap",
   "gates_implemented": {
     "G1": true,
@@ -18,14 +18,14 @@
   "cross_run_consensus": null,
   "unresolved_count": 25,
   "coverage": {
-    "matched": 156,
+    "matched": 177,
     "total": 1675,
-    "ratio": 0.093134,
+    "ratio": 0.105672,
     "_definition": "matched functions / binary call targets（call 目标作为可枚举函数下界）"
   },
   "_null_means": "null = 该指标尚未测得（对应门槛脚本未实现）。禁止填 0 冒充「无问题」。",
   "_notes": {
-    "type_conflicts": "null = 尚无定义被测得（bootstrap 期 /src 与 /include 为空）",
+    "type_conflicts": "G1 实测值。0 表示当前 95 个 struct 定义全部一致，无冲突",
     "witnessless_elements": "G2 实测值。0 表示当前源码的见证声明全部命中；不表示二进制已被完全解释（见 reverse_coverage）",
     "G6": "部分能力 UNSUPPORTED（无 RTTI 名 / 无 .pdata / 无多反编译器），gates_implemented.G6 记 false",
     "G5": "INCOMPLETE：编译器缺口（缺 MSVC 27412/31328/31332）导致两个原文要求都无法执行",
@@ -33,25 +33,25 @@
   },
   "_g1_last_run": {
     "failures": 0,
-    "definitions_checked": 86
+    "definitions_checked": 95
   },
   "_g2_last_run": {
     "status": "INCOMPLETE",
     "instruction_count": 203941,
     "binary_call_targets": 1675,
-    "witness_items": 164,
-    "function_coverage": 0.093134,
-    "matched_functions": 156
+    "witness_items": 185,
+    "function_coverage": 0.105672,
+    "matched_functions": 177
   },
   "_g4_last_run": {
     "status": "PASS",
-    "files_checked": 16,
+    "files_checked": 18,
     "violations": 0,
     "clang_format_available": false
   },
   "_g3_last_run": {
     "status": "PASS",
-    "functions": 156,
+    "functions": 177,
     "failures": 0
   },
   "_g6_last_run": {
@@ -74,9 +74,9 @@
   },
   "byte_match": {
     "status": "FAIL",
-    "matched": 131,
-    "verified": 156,
-    "_note": "131/156 字节相等。25 个 DIFF 全部为已知物理不可得（19 fsincos + 5 hotpatch 序言 + 1 and [mem],0），见 ledger/unresolved.md",
+    "matched": 152,
+    "verified": 177,
+    "_note": "152/177 字节相等。25 个 DIFF 全部为已知物理不可得（19 fsincos + 5 hotpatch 序言 + 1 and [mem],0）",
     "_diff_addresses": [
       "0x00404B70",
       "0x00405A70",
@@ -125,5 +125,24 @@
       "matched": 131
     },
     "_note": "新形状 5 类：从指针取值写入 / 数组元素写入 / 8 字节聚合整块赋值 / 全局对象整体拷贝 / 全局表索引。其余为已有形状的新实例。"
+  },
+  "batch5": {
+    "_date": "2026-11-24",
+    "added": 21,
+    "added_passed": 21,
+    "added_failed": 0,
+    "files": [
+      "src/MoreFields2.cpp",
+      "include/MoreFields2.hpp"
+    ],
+    "before": {
+      "targets": 156,
+      "matched": 131
+    },
+    "after": {
+      "targets": 177,
+      "matched": 152
+    },
+    "_negative": "另有 4 个同族函数（8bff 前缀）实测 24 种 flags 组合均不可得，未写入"
   }
 }

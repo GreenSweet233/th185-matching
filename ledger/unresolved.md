@@ -36,6 +36,21 @@
 
 证据：`evidence/P4-hotpatch-and-encoderemain.json`
 
+### 类别 4：hotpatch 序言 `8bff` 的第二批确认（4 个同族，2026-11-24 第 5 批复测）
+
+`0x0049D72A 0x004A7C50 0x0049DEFD 0x0049DF39`
+
+这四个是第 5 批匹配函数的**同族成员**：机器码形状完全一致，只多一个 `8bff`（`mov edi,edi`）前缀。
+
+| flags 组合（24 种）| 以 `8bff` 开头 | 以 `6690` 开头 |
+|---|---:|---:|
+| `/O1 /O2 /Od` × `/Oy- /Oy` × `/hotpatch` × `/Gy` | **0** | **8**（全部 `/hotpatch` 组合）|
+
+**这是对类别 2 的独立复现** —— 换了一批函数、换了一套 flags 枚举，结论一致：
+v142 的 `/hotpatch` 选 `66 90` 而非 `8bff`。
+
+处置：**不写入 src/**（宁可 unmatched，不可 garbage match）。
+
 ### 类别 3：`and dword [mem], 0`（1 个）— 不可得
 
 `0x00490463`
