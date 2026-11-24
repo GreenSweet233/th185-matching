@@ -81,6 +81,34 @@ MSVC x86 上用 x87 栈返回 float，**只有返回 `__m128` 才走 XMM0**。
 
 ---
 
+## 三·五、★★ 修正：「`return 1` 物理不可得」是错的
+
+我曾在本文档写过：
+
+> `xor eax,eax; inc eax` | 1 | `return 1` 被优化成 `mov eax,1`
+
+**这条记录是错的。** 实测：
+
+| 源码 | `/O2` | `/O1` |
+|---|---|---|
+| `return 1` | `b801000000c3`（`mov eax,1; ret`）| **`33c040c3`（`xor eax,eax; inc eax; ret`）** |
+| `return 0` | `33c0c3`（`xor eax,eax; ret`）| 同 |
+
+原版那个函数用的是 **`/O1`**。用 `FLAG_OVERRIDES` 单独指定即可匹配：
+
+```python
+FLAG_OVERRIDES = {
+    "0x00490258": "/MT /O1 /GS- /Oy-",
+}
+```
+
+结果：`0x00490258` MATCH（4 字节）。
+
+**教训**：「生成不出来」的结论必须区分「编译器版本不对」和「优化级不对」。
+我此前只穷举了版本（v141/v142/v143），没穷举优化级（/O1 /O2 /Ox /Os）。
+
+---
+
 ## 四、★ 第二重要的发现：原版是 C++ 类，写成员函数
 
 ```cpp
@@ -105,7 +133,7 @@ int Obj00::get() { return f_00; }
 | `fsincos` 函数 | 19 | MSVC 编译器前端**永不**生成该指令（跨 v141/v142 穷举 60 种组合都不行），它是 CRT 内部实现 |
 | `encode_value` | 1 | 需 `8bff` hotpatch 序言，v141/v142 都生成 `66 90` |
 | `and [mem],0` | 1 | 现代 MSVC 对 `g_v = 0` 生成 `mov`，不生成 `and` |
-| `xor eax,eax; inc eax` | 1 | `return 1` 被优化成 `mov eax,1` |
+| ~~`xor eax,eax; inc eax`~~ | ~~1~~ | **已推翻**：不是不可得，是 `/O1` vs `/O2` 的差异（见下）|
 | G6 三项 | 3 | `/GR-` 无 RTTI、PE32 无 `.pdata`、无第二个反汇编器 |
 
 ---

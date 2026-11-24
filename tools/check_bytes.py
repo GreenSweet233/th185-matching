@@ -324,6 +324,10 @@ def main():
     # 每个地址的编译 flags 覆盖（只有极少数函数需要 /Os，见 toolchain.lock 规则 5）
     FLAG_OVERRIDES = {
         "0x0048F711": "/MT /Os /GS- /Oy-",
+        # ★ `return 1` 在 /O1 下生成 `33c040c3`（xor/inc/ret），
+        # 在 /O2 下生成 `b801000000c3`（mov eax,1/ret）。
+        # 原版这个函数用的是 /O1。
+        "0x00490258": "/MT /O1 /GS- /Oy-",
     }
 
     def _func_name_after(lines, marker_idx, fn_hint=None):
