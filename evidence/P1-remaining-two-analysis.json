@@ -1,0 +1,142 @@
+{
+  "_comment": "P1 剩余 2 个失败函数的完整调查记录。结论：两者都指向「原版此处的代码生成方式与 MSVC v142 的常规输出不符」，但仍未找到确切原因。",
+  "date": "2026-11-24",
+  "current": {
+    "matched": 7,
+    "total": 11,
+    "flags": "/MT /O2 /GS- /Oy-"
+  },
+  "case_1_read_first_float": {
+    "va": "0x00404B60",
+    "original": "f30f1001c3",
+    "disasm": "movss xmm0, dword [ecx] ; ret  (5 字节)",
+    "our_output": "d901c3",
+    "our_disasm": "fld dword [ecx] ; ret  (3 字节)",
+    "proven_is_float_return": {
+      "evidence": "调用方 0x00438F2B call 0x404B60 之后紧接 `0x00438F30 movss [ebp-0x630], xmm0`",
+      "conclusion": "调用方从 XMM0 取值，所以这个函数确实通过 XMM0 返回 float"
+    },
+    "exhaustive_flag_test": {
+      "tried": [
+        "/O2",
+        "/O2 /arch:SSE2",
+        "/O2 /arch:SSE",
+        "/O2 /fp:fast",
+        "/O2 /arch:SSE2 /fp:fast",
+        "/O1",
+        "/O2 /Oy",
+        "/O2 /Oy-",
+        "/O2 /Oy- /Gv",
+        "/O2 /Oy- /Gr",
+        "/O2 /Oy- /Gz",
+        "/O2 /Oy- /Gd",
+        "/O2 /Oy- /arch:AVX",
+        "/O2 /Oy- /Oi /Ot"
+      ],
+      "all_produced": "d901c3 (fld dword [ecx] ; ret)",
+      "count": 14
+    },
+    "alternative_sources_tried": [
+      {
+        "form": "float 返回（普通）",
+        "result": "d901c3"
+      },
+      {
+        "form": "float 返回 + volatile",
+        "result": "d901c3"
+      },
+      {
+        "form": "struct { float v; } 返回",
+        "result": "558bec51f30f1001f30f1145fc8b45fc8be55dc3",
+        "note": "用内存返回，不是 XMM0"
+      },
+      {
+        "form": "__m128 返回（直接）",
+        "result": "语法错误",
+        "note": "__fastcall 与 __m128 冲突"
+      },
+      {
+        "form": "align(16) struct 返回",
+        "result": "538bdc83ec08... 大量序言",
+        "note": "有 SEH 序言"
+      }
+    ],
+    "conclusion": "MSVC x86 从不单用 XMM0 返回 float（用 x87 ST0）。原版这个 5 字节函数与 MSVC 的常规 float 返回约定不符。",
+    "hypotheses": [
+      "① 这个函数返回类型不是 float 而是 __m128（但那样 MSVC 会生成更多序言）",
+      "② 原版此编译单元不是 MSVC v142 产出（可能是 v141/VS2017，或其他编译器）",
+      "③ 这是 inline 函数被 out-of-line 实例化的结果，代码生成路径特殊",
+      "④ 原版用了 MSVC 未公开的编译选项"
+    ],
+    "status": "UNRESOLVED"
+  },
+  "case_2_encode_value": {
+    "va": "0x0049DC88",
+    "original": "8bff558beca14c8a4c0083e01f6a20592bc88b4508d3c833054c8a4c005dc3",
+    "disasm": [
+      "mov edi, edi            ; 8bff  <- hotpatch 序言",
+      "push ebp / mov ebp, esp ; 55 8bec",
+      "mov eax, [0x4C8A4C]     ; a1 4c8a4c00",
+      "and eax, 0x1F           ; 83e01f",
+      "push 0x20               ; 6a20",
+      "pop ecx                 ; 59     <- 比 mov ecx,0x20 (b920000000) 长 2 字节",
+      "sub ecx, eax            ; 2bc8",
+      "mov eax, [ebp+8]        ; 8b4508",
+      "ror eax, cl             ; d3c8",
+      "xor eax, [0x4C8A4C]     ; 33054c8a4c00",
+      "pop ebp / ret           ; 5d c3"
+    ],
+    "key_anomalies": [
+      "`mov edi,edi` 是 hotpatch 序言 —— 需要 /hotpatch 或增量链接（/INCREMENTAL）",
+      "`push 0x20 / pop ecx` 而非 `mov ecx,0x20` —— 这是 /Od 或极低优化的特征，但其余代码又很紧凑",
+      "`ror eax,cl` 说明是真正的变量移位，不是常量折叠"
+    ],
+    "flag_sweep": {
+      "combinations_tested": 25,
+      "axes": {
+        "opt": [
+          "/Od",
+          "/O1",
+          "/O2",
+          "/Ox",
+          "/Os"
+        ],
+        "extra": [
+          "",
+          " /Oy-",
+          " /Oy- /GS-",
+          " /GS- /Oy- /Gz",
+          " /Oy- /Gy-"
+        ]
+      },
+      "matched": 0,
+      "samples": {
+        "/O2 /Oy- /GS-": "558bec8b55088bc2568b354c8a4c00f7de83e61f8bcef7d983e11fd3e08bced3ea0bc233054c8a4c",
+        "/O1 /Oy- /GS-": "558bec8b55088bc256578b3d4c8a4c008bf7f7de83e61f8bcef7d983e11fd3e08bced3ea0bc233c7",
+        "/Od /GS-": "558bec83ec08a14c8a4c008945f88b4df883e11fba200000002bd183e21f8955fc8b45088b4dfcd3"
+      },
+      "closest": "/Od 版本有 a1( mov eax,moffs32) 和 push-风格，但仍有 sub esp,8 和多层内存往返"
+    },
+    "conclusion": "`mov edi,edi` + `push 0x20/pop ecx` 的组合在任何常规 MSVC 选项下都不出现。",
+    "hypotheses": [
+      "① 原版这个编译单元开了 /hotpatch（生成 mov edi,edi 序言）",
+      "② 同时优化级很低（解释 push/pop 与栈往返）",
+      "③ 可能是手写汇编或 intrinsic 包装",
+      "④ 该项目有增量链接（/INCREMENTAL 也会产生 hotpatch 序言）"
+    ],
+    "next_experiment": "试 /hotpatch 与 /INCREMENTAL 组合（但需完整链接才能验证 hotpatch 是否影响单个 obj）",
+    "status": "UNRESOLVED"
+  },
+  "what_this_teaches": {
+    "lesson_1": "P1 能发现静态门槛和行为验证都发现不了的问题。7/11 说明大部分代码确实是 v142 /O2 /Oy- 产出，但剩余 2 个指向不同的代码生成路径。",
+    "lesson_2": "「原版有这个指令」不等于「某种常规编译选项会生成它」。`push 0x20/pop ecx` 这种在 MSVC 里几乎只出现在手写汇编或极低优化级中。",
+    "lesson_3": "不要为了凑字节而修改源码去迎合编译器 —— 如果找不到正确写法，应该如实标记 UNRESOLVED，而不是写出奇怪的代码让它恰好匹配。",
+    "future_approach": [
+      "① 装 VS2017 (v141) 工具集测试这两个函数",
+      "② 试 /hotpatch 和 /INCREMENTAL",
+      "③ 用 objdump/Ghidra 交叉检查是否有非 MSVC 特征",
+      "④ 接受这 2 个可能永远无法字节匹配，标记为「行为等价但字节不同」"
+    ]
+  },
+  "tested_at": "2026-11-24T07:28:40.108Z"
+}

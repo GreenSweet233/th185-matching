@@ -1,0 +1,64 @@
+{
+  "_comment": "AGENTS.md §12：门槛脚本必须能用变异测试证明自己会失败。本文件记录 G2 的自检结果。",
+  "gate": "G2",
+  "script": "tools/check_witness.py",
+  "shared_module": "tools/pe_common.py",
+  "target_exe": "本地 th185.exe（不入库，经 local.target.json 定位）",
+  "findings_during_development": [
+    {
+      "issue": "反汇编只覆盖 17.4%，call 目标漏掉 88%",
+      "cause": "capstone 默认遇到无法解码的字节就停止，不继续",
+      "measured": {
+        "default": {
+          "instructions": 37854,
+          "bytes_covered": 124029,
+          "total_bytes": 711114,
+          "percent": 17.4,
+          "call_targets": 194,
+          "stopped_at": "0x0041F47D"
+        },
+        "skipdata": {
+          "instructions": 208003,
+          "bytes_covered": 711114,
+          "percent": 100,
+          "call_targets": 1678,
+          "pseudo_data_instructions": 487
+        }
+      },
+      "fix": "make_disassembler() 里设 md.skipdata = True",
+      "lesson": "G2 的『二进制事实库』如果只看到前 17%，后面所有见证都会被误判为不存在"
+    },
+    {
+      "issue": "覆盖率 0% 却报 PASS",
+      "cause": "判定只看 failures（声明了但找不到），没看反向覆盖率",
+      "fix": "引入三态：FAIL / INCOMPLETE / PASS。INCOMPLETE = 无失败但反向覆盖率 < 100%",
+      "lesson": "§11 要求人类只看仪表盘，那 PASS 就不能涵盖『什么都没解释』"
+    }
+  ],
+  "mutation_tests": [
+    {
+      "id": "M1-real-vs-fake",
+      "mutation": "同时声明 call 0x401150（真实目标）与 call 0x999999（不存在）",
+      "expected": "真见证命中、假见证 FAIL",
+      "actual": "reverse coverage 1/1678（真见证计入）；FAIL witness_not_found: call 0x999999 not a call target in target .text",
+      "result": "PASS"
+    }
+  ],
+  "cross_check_with_external_evidence": {
+    "claim": "thprac 记录 AddCard 的调用点是 0x00414F20",
+    "verified": "0x00414F20 确实在反汇编得到的 1678 个直接 call 目标里",
+    "significance": "外部权威地址与本脚本的二进制事实库交叉印证，说明 PE 读取与反汇编链路正确"
+  },
+  "current_state": {
+    "status": "INCOMPLETE",
+    "reason": "src/ 尚无见证声明（bootstrap）。反向覆盖率 0/1678。",
+    "note": "INCOMPLETE 不等于 PASS；§11 仪表盘 gates_implemented.G2 记为 false"
+  },
+  "toolchain_constraint": {
+    "original": "MSVC build 27412 / 31328 / 31332 (VS2019 16.0/16.8/16.9)",
+    "local": "只有 VS2022 Community MSVC 14.44.35207；VS2019 目录存在但为空",
+    "consequence": "G2 中『编译自己的 .obj 与 /orig 逐条比对』这一半无法进行（§2 禁止用 VS2022 冒充 VS2019）。当前实现的是不依赖编译器的那一半：目标二进制事实库 + 源码见证声明校验 + 反向覆盖率。",
+    "resolution_needed": "安装 VS2019 对应 build，或人类按 §8 第 5 条裁决"
+  },
+  "tested_at": "2026-11-24T04:51:33.310Z"
+}

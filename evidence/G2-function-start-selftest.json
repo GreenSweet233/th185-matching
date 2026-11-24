@@ -1,0 +1,103 @@
+{
+  "_comment": "G2 的函数边界回溯修复自检。AGENTS.md §12：门槛脚本必须能证明自己会失败。",
+  "gate": "G2",
+  "script": "tools/check_witness.py",
+  "bug_found": {
+    "summary": "function_extent 假设「call 的目标地址 = 函数起点」，这个假设是错的",
+    "discovery_path": "上一轮扫「只用 [ecx+0x4] 和 [ecx+0x8] 的叶子函数」得到 340 个，按指令形状分组后出现『4 个函数共享一段代码，只是入口点不同』的诡异结果",
+    "actual_binary": {
+      "function_true_range": "0x0044D9F0..0x0044DA44",
+      "disassembly": [
+        "0x0044D9F0  push ebp                 <- 函数真正起点",
+        "0x0044D9F1  mov ebp, esp",
+        "0x0044D9F3  movss xmm0, [ebp+8]",
+        "0x0044D9FB  mov edx, ecx",
+        "0x0044D9FD  mov ecx, [ebp+0xC]       <- ecx = 第三参数（输出指针）",
+        "0x0044DA10  call 0x004587B0",
+        "0x0044DA15  movss xmm0, [ecx]        <- 被误当成函数起点",
+        "0x0044DA19  addss xmm0, [edx+0x54]",
+        "0x0044DA1E  movss [ecx], xmm0",
+        "0x0044DA22  movss xmm0, [edx+0x58]",
+        "0x0044DA27  addss xmm0, [ecx+4]",
+        "0x0044DA2C  movss [ecx+4], xmm0",
+        "0x0044DA31  movss xmm0, [edx+0x5C]",
+        "0x0044DA36  addss xmm0, [ecx+8]",
+        "0x0044DA3B  movss [ecx+8], xmm0",
+        "0x0044DA40  pop ebp",
+        "0x0044DA41  ret 8                    <- 函数真正终点"
+      ]
+    },
+    "why_dangerous": "从 call 返回后的下一条指令切函数，切到的是函数中部。后果有两个：① 结构统计（G3 的循环/分支数）会基于错误范围 ② 见证校验会基于错误范围，一条在真函数里成立的 disp 可能被判 FAIL，反之亦然"
+  },
+  "fix": {
+    "approach": "新增 find_function_start()：从 call 目标往前回溯，直到遇到函数边界",
+    "stopping_conditions": [
+      "前一条指令是 ret / ret N / int3 -> 当前位置即函数起点",
+      "前一条是 push ebp（标准帧序言）-> 从它起",
+      "回溯超过 64 条指令 -> 放弃，用原地址",
+      "回溯到 .text 起点 -> 停止",
+      "目标地址不在已知指令边界上 -> 不回溯（可能是数据或 thunk 目标）"
+    ],
+    "implementation_notes": [
+      "用 bisect 在有序地址表上定位，不是每次线性扫全表（1678 个目标 × 线性扫 = O(n²)）",
+      "第一版回溯没有边界检查，跑出了 0xE916EE25 这类非法 VA，已加 text_lo 判断"
+    ]
+  },
+  "mutation_tests": [
+    {
+      "addr": "0x0044DA15",
+      "expected_lo": "0x0044D9F0",
+      "actual": "0x0044D9F0",
+      "result": "PASS",
+      "case": "call 之后的下一条（函数中部）"
+    },
+    {
+      "addr": "0x0044DA19",
+      "expected_lo": "0x0044D9F0",
+      "actual": "0x0044D9F0",
+      "result": "PASS",
+      "case": "再往后 4 字节"
+    },
+    {
+      "addr": "0x0044DA1E",
+      "expected_lo": "0x0044D9F0",
+      "actual": "0x0044D9F0",
+      "result": "PASS",
+      "case": "再往后 5 字节"
+    },
+    {
+      "addr": "0x0044DA22",
+      "expected_lo": "0x0044D9F0",
+      "actual": "0x0044D9F0",
+      "result": "PASS",
+      "case": "再往后 4 字节"
+    },
+    {
+      "addr": "0x00402A50",
+      "expected_lo": "0x00402A50",
+      "actual": "0x00402A50",
+      "result": "PASS",
+      "case": "本身就是序言，应保持不变"
+    },
+    {
+      "addr": "0x004903B9",
+      "expected_lo": "0x004903B4",
+      "actual": "0x004903B4",
+      "result": "PASS",
+      "case": "xor eax,eax 前的入口"
+    }
+  ],
+  "impact_measurement": {
+    "call_targets": 1678,
+    "distinct_real_functions": 1660,
+    "merged_duplicate_entries": 15,
+    "out_of_bounds_before_fix": 3,
+    "out_of_bounds_after_fix": 0,
+    "note": "15 个多入口全部是函数内偏移（如 0x004903B4/0x004903B9 相差 5 字节），合理"
+  },
+  "no_regression": {
+    "statement": "修复后六个门槛状态与修复前完全一致（G1/G3/G4 PASS，G2/G5/G6 INCOMPLETE），已匹配的 50 个函数未受影响",
+    "verified_by": "re-ran all six gate scripts"
+  },
+  "tested_at": "2026-11-24T05:49:57.209Z"
+}

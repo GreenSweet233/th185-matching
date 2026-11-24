@@ -1,0 +1,6 @@
+{
+  "_comment": "已锁定类型。锁定后不可被新函数推翻；要改走 conflict proposal（AGENTS.md §6 G1、§8 第 5 条）。",
+  "version": 1,
+  "_note": "当前为空。G1 的自检结果见 evidence/G1-selftest.json。",
+  "locked": {}
+}

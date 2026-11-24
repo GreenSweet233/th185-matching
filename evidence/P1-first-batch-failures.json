@@ -1,0 +1,138 @@
+{
+  "_comment": "★ P1 首次批量验证：11 个函数只有 2 个字节相等。这是 P1 存在意义的直接证明——静态门槛和 G2+ 行为验证全过，但字节全错。",
+  "date": "2026-11-24",
+  "result": {
+    "matched": 2,
+    "total": 11
+  },
+  "matched": [
+    {
+      "func": "0x00402A50 tick_timer",
+      "bytes": 68,
+      "note": "上一轮已确认（用 __fastcall + /O2）"
+    },
+    {
+      "func": "0x004903B9 return_zero",
+      "bytes": 3,
+      "note": "xor eax,eax; ret —— 无论调用约定都一样"
+    }
+  ],
+  "failures": [
+    {
+      "func": "0x00404AA0 return_this",
+      "orig": "8bc1c3",
+      "ours": "8b442404c3",
+      "root_cause": "调用约定错误：原版 thiscall（ecx=this），源码写成普通函数（cdecl，从 [esp+4] 取参数）",
+      "fix": "改成 __fastcall + 哑 edx 参数",
+      "verified_fix": "8bc1c3 ← 已实测匹配"
+    },
+    {
+      "func": "0x0041FA20 read_first_field",
+      "orig": "8b01c3",
+      "ours": "8b4424048b00c3",
+      "root_cause": "同上，调用约定",
+      "verified_fix": "8b01c3 ← 已实测匹配"
+    },
+    {
+      "func": "0x00404B60 read_first_float",
+      "orig": "f30f1001c3",
+      "ours": "8b442404d900c3",
+      "root_cause": "两处：① 调用约定 ② MSVC 用 x87 fld 返回 float，原版用 SSE movss",
+      "investigation": {
+        "tried_flags": [
+          "/O2",
+          "/O2 /arch:SSE2",
+          "/O2 /arch:SSE",
+          "/O2 /fp:fast",
+          "/O2 /arch:SSE2 /fp:fast",
+          "/O1",
+          "/O2 /Oy"
+        ],
+        "all_produced": "d901c3 = fld dword [ecx] ; ret",
+        "conclusion": "MSVC 在 x86 上用 x87 栈返回 float（ST0），不用 XMM0。原版 f30f1001c3 = movss xmm0,[ecx] 说明**这个函数不是「返回 float」的普通函数**",
+        "hypotheses": [
+          "可能是返回 __m128 而非 float（但那样会是 movups 16 字节）",
+          "可能是 inline 展开后的片段，不是独立函数",
+          "可能原版编译器不是 v142（Rich Header 显示 prodId 27412=VS2017 占 237 单元）"
+        ],
+        "status": "未解决 —— 需要进一步调查或换 VS2017 工具集"
+      }
+    },
+    {
+      "func": "0x00406720 set_first_field",
+      "orig": "558bec8b450889015dc20400",
+      "ours": "8b4424048b4c24088908c3",
+      "root_cause": "两处：① 原版有完整栈帧 push ebp/mov ebp,esp/pop ebp（说明这个函数**没有被内联优化**）② ret 4 说明是 stdcall/thiscall 带栈清理",
+      "analysis": "原版 12 字节有栈帧，我们的 10 字节无栈帧。/O2 会省略栈帧，说明这个函数在原版里可能是**调试构建或未优化编译单元**",
+      "status": "未解决 —— 可能需要不同优化级或不同编译单元"
+    },
+    {
+      "func": "0x00405830 copy_vec3",
+      "orig": "558bec8b4508f30f7e00660fd6018b40088941085dc20400",
+      "ours": "8b5424088b4c24048b0289018b42048941048b4208894108c3",
+      "root_cause": "同 set_first_field：原版有栈帧 + 用 movq xmm0（SSE），我们用两次普通 mov",
+      "status": "未解决"
+    },
+    {
+      "func": "0x0049DC88 encode_value",
+      "orig": "8bff558beca14c8a4c0083e01f6a20592bc88b4508d3c833054c8a4c005dc3",
+      "ours": "8b154c8a4c008bcaf7d983e11f7507335424048bc2c38b442404d3c833c2c3",
+      "root_cause": "原版有 mov edi,edi（hotpatch 序言）+ 完整栈帧，且用 push 0x20/pop ecx 而非常量折叠",
+      "analysis": "原版的指令序列非常『手工感』（push/pop 代替 mov），可能开了 /Od 或该编译单元未优化",
+      "status": "未解决"
+    }
+  ],
+  "key_finding": {
+    "summary": "9 个函数全部不匹配，根因分三类",
+    "categories": [
+      {
+        "name": "调用约定错误",
+        "affected": [
+          "0x00404AA0",
+          "0x0041FA20"
+        ],
+        "fixable": true,
+        "fix": "用 __fastcall + 哑 edx 参数",
+        "verified": "两个都已实测修好"
+      },
+      {
+        "name": "浮点返回机制不同",
+        "affected": [
+          "0x00404B60"
+        ],
+        "fixable": "unknown",
+        "detail": "MSVC x86 用 x87 fld 返回 float；原版用 SSE movss"
+      },
+      {
+        "name": "原版函数有栈帧/未优化",
+        "affected": [
+          "0x00406720",
+          "0x00405830",
+          "0x0049DC88"
+        ],
+        "fixable": "unknown",
+        "detail": "原版有 push ebp/mov ebp,esp/pop ebp 完整栈帧，而 /O2 会省略。/GS- 也不影响这个（栈帧与 cookie 无关）"
+      }
+    ]
+  },
+  "why_this_is_valuable": {
+    "static_gates_passed": "这 9 个函数全部通过 G1/G2/G3/G4/G6",
+    "behavior_verified": "这 9 个函数全部通过 G2+ 行为验证（21/51 用例）",
+    "byte_mismatch": "但字节 0% 匹配",
+    "conclusion": "静态门槛验证的是『形式对不对』，行为验证验证的是『语义对不对』，P1 验证的是『编译器产出对不对』。三者缺一不可。"
+  },
+  "next_questions": [
+    "原版是否有一部分函数用 /Od 或 /O1 编译？（栈帧的存在说明可能）",
+    "Rich Header 的 prodId 27412（VS2017，237 单元）是否就是这些『有栈帧』函数的来源？",
+    "read_first_float 的 movss 是否说明它不是普通 C++ 函数？",
+    "是否需要同时安装 VS2017 15.x 工具集？"
+  ],
+  "toolchain_facts_verified": {
+    "compiler": "MSVC v142 19.29.30159 (x86)，从 .vsix 解压，无管理员权限",
+    "flags_that_worked": "/MT /O2 /GS-",
+    "call_convention_technique": "__fastcall + 哑 edx 参数 模拟 thiscall（MSVC 不允许自由函数用 __thiscall）",
+    "p1_now_automated": "tools/check_bytes.py —— 可批量编译 + 比对",
+    "/GS_question_answered": "0x00402A50 函数体内 0 处引用 __security_cookie，0 处 xor eax,ebp，所以 /GS- 对它是正确的。/GS 是逐函数决定（只有含数组/大局部变量的才插入）"
+  },
+  "tested_at": "2026-11-24T07:22:22.188Z"
+}

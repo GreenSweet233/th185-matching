@@ -1,0 +1,157 @@
+{
+  "_comment": "探索含 call 的函数能否匹配。结论：比叶子函数难得多，因为栈清理方式也有代码生成差异。",
+  "date": "2026-11-24",
+  "motivation": "叶子函数已匹配 75 个（P1 30/33）。要推进项目必须攻克含 call 的复杂函数。",
+  "step_1_find_candidates": {
+    "query": "含 1 个 call 到已匹配函数、4-10 条指令",
+    "result": 0,
+    "explanation": "已匹配的都是最底层叶子函数，还没有中层函数调用它们。自底向上匹配的自然节奏。"
+  },
+  "step_2_hot_functions": {
+    "query": "统计被调用次数最多的未匹配函数",
+    "top_findings": [
+      {
+        "va": "0x0048F6D3",
+        "callers": 306,
+        "instrs": 4,
+        "identity": "__security_check_cookie",
+        "note": "cmp ecx,[0x4C8A4C] / jne / ret + jmp 到 fail 处理"
+      },
+      {
+        "va": "0x00491360",
+        "callers": 290,
+        "instrs": 89
+      },
+      {
+        "va": "0x0048A540",
+        "callers": 275,
+        "instrs": 40
+      },
+      {
+        "va": "0x0048A4A0",
+        "callers": 241,
+        "instrs": 49
+      },
+      {
+        "va": "0x00440090",
+        "callers": 231,
+        "instrs": 125,
+        "identity": "ECL 参数读取器（已知）"
+      },
+      {
+        "va": "0x0048F711",
+        "callers": 202,
+        "instrs": 7
+      },
+      {
+        "va": "0x0049F104",
+        "callers": 166,
+        "instrs": 7
+      }
+    ],
+    "discovery": "原版大量启用 /GS —— __security_check_cookie 被调用 306 次"
+  },
+  "step_3_wrapper_analysis": {
+    "target": "0x0048F711",
+    "callers": 202,
+    "bytes": "558becff7508e863090000595dc3",
+    "disasm": [
+      "push ebp / mov ebp, esp",
+      "push dword [ebp+8]",
+      "call 0x0049007F        ; ★ 这个是 CPU 特性探测函数（含 cpuid，473 字节）",
+      "pop ecx                ; 清栈",
+      "pop ebp / ret"
+    ],
+    "callee_identity": "0x0049007F 是 CPU 特性探测（cpuid 指令、检测 SSE/AVX 等），473 字节，1 个调用方"
+  },
+  "step_4_codegen_difference": {
+    "finding": "★ 原版用 `pop ecx` 清栈（1 字节），MSVC /O2 生成 `add esp,4`（3 字节）",
+    "target": "558bec ff7508 e8xxxxxxxx 59 5d c3",
+    "our_output": "558bec ff7508 e8xxxxxxxx 83c404 5d c3      （cdecl 丢弃返回值）",
+    "tested_forms": [
+      {
+        "form": "cdecl 丢弃返回值",
+        "bytes": "558becff7508e80000000083c40433c05dc3"
+      },
+      {
+        "form": "cdecl 返回值",
+        "bytes": "558bec5de900000000",
+        "note": "尾调用优化"
+      },
+      {
+        "form": "cdecl void",
+        "bytes": "e900000000",
+        "note": "完全尾调用"
+      },
+      {
+        "form": "thiscall 无参（__fastcall 模拟）",
+        "bytes": "558becff7508e80000000083c4045dc20400"
+      }
+    ],
+    "conclusion": "**MSVC /O2 用 add esp,4，原版用 pop ecx。** 这是又一处代码生成差异，与之前的 fsincos / hotpatch 同类。"
+  },
+  "step_5_associated_issue": {
+    "problem": "call rel32 在未链接的 .obj 里是占位值（0 或 -5）",
+    "consequence": "P1 现有的 check_bytes.py 只编译不链接，无法正确比较含 call 的函数",
+    "needed": [
+      "① 需要链接步骤，或",
+      "② 需要解析 COFF relocation 表，把 rel32 排除在比较之外"
+    ],
+    "impact": "这是 P1 扩展到含 call 函数的**前置工程问题**，不是代码生成问题"
+  },
+  "honest_assessment": {
+    "why_call_functions_are_harder": [
+      "① rel32 未链接时是占位值，需要 relocation 处理",
+      "② 栈清理方式（pop vs add esp）有代码生成差异",
+      "③ 调用约定必须精确匹配（ret N vs ret）",
+      "④ 可能触发尾调用优化（jmp 而非 call）"
+    ],
+    "recommendation": [
+      "短期：先解决 P1 的 relocation 问题，让含 call 的函数能进入比较",
+      "中期：系统研究 MSVC 的 pop-vs-add-esp 选择规律",
+      "长期：可能需要多个 VS 版本并存（这个证据又一次指向这点）"
+    ]
+  },
+  "cumulative_evidence_for_older_toolchain": [
+    "① fsincos：MSVC 前端不合成 x87 复合指令",
+    "② hotpatch：v142 用 66 90，原版用 8b ff",
+    "③ pop ecx vs add esp,4：v142 /O2 不做这个优化",
+    "三条独立证据都指向「原版含更早 VS 版本」，但仍不足以确定具体版本"
+  ],
+  "tested_at": "2026-11-24T08:28:25.550Z",
+  "_CORRECTION_2026_11_24": {
+    "_comment": "★★ 重大修正：上一轮把 `pop ecx vs add esp,4` 归因为「编译器版本差异」，这是错的。实际是优化级差异（/Os）。",
+    "wrong_conclusion": "step_4_codegen_difference 里说「MSVC /O2 不做 pop ecx 这个优化，说明原版含更早 VS 版本」",
+    "correct_finding": {
+      "tested_flags": {
+        "/O2": "558becff7508e800000000 83c404 33c0 5dc3   → add esp,4",
+        "/O1": "558becff7508e800000000 59 33c0 5dc3        → pop ecx",
+        "/Os": "558becff7508e800000000 59 5dc3             → pop ecx，且无 xor eax,eax → **MATCH**",
+        "/Ox": "558becff7508e800000000 83c404 33c0 5dc3   → add esp,4",
+        "/Od": "558bec8b450850e800000000 83c404 33c0 5dc3 → add esp,4"
+      },
+      "verdict": "**/Os 精确匹配**：558becff7508e800000000595dc3",
+      "source": "extern \"C\" void target(int); void f(int a){ target(a); }"
+    },
+    "why_hypothesis_was_wrong": [
+      "我只测了 /O2 就下结论「MSVC 不做这个优化」",
+      "没有穷举 /O1 /Os /Ox /Od",
+      "和之前「14 种选项测不出 movss」不同 —— 这次是**没有测足够多**就归因到版本"
+    ],
+    "impact_on_cumulative_evidence": {
+      "before": "三条证据指向「原版含更早 VS 版本」",
+      "after": "**第三条（pop ecx）已被推翻**，只剩两条（fsincos、hotpatch 序言）",
+      "note": "这两条仍需独立验证，但「版本差异」的证据强度下降了"
+    },
+    "broader_lesson": "**「某个选项不生成 X」不等于「MSVC 不生成 X」—— 必须穷举优化级。** 这和之前 Rich Header 的错误同类：基于不完整的采样做结构性判断。"
+  },
+  "_new_insight_optimization_level": {
+    "finding": "原版可能不同编译单元用了不同优化级（/O2 和 /Os 并存）",
+    "evidence": [
+      "0x00402A50 等：/O2 /Oy- 匹配",
+      "0x0048F711：/Os /Oy- 匹配"
+    ],
+    "implication": "P1 验证器必须支持**逐函数指定优化级**，不能全局用一个 flags",
+    "next_step": "给 check_bytes.py 加 per-function flags 支持"
+  }
+}

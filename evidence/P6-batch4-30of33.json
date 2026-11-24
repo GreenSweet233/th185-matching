@@ -1,0 +1,102 @@
+{
+  "_comment": "第四批 7 个访问器全部匹配。P1 累计 30/33（90.9%）。加上第三批，连续两批 14/14 全中。",
+  "date": "2026-11-24",
+  "batch4": {
+    "tested": 7,
+    "matched": 7,
+    "new_matches": [
+      {
+        "va": "0x0040A090",
+        "bytes": 7,
+        "hex": "8d8174120000c3",
+        "disasm": "lea eax,[ecx+0x1274]"
+      },
+      {
+        "va": "0x00417770",
+        "bytes": 4,
+        "hex": "8b4134c3",
+        "disasm": "mov eax,[ecx+0x34]"
+      },
+      {
+        "va": "0x00433B90",
+        "bytes": 4,
+        "hex": "8b4104c3",
+        "disasm": "mov eax,[ecx+4]"
+      },
+      {
+        "va": "0x00433DC0",
+        "bytes": 4,
+        "hex": "8d4144c3",
+        "disasm": "lea eax,[ecx+0x44]"
+      },
+      {
+        "va": "0x00431300",
+        "bytes": 4,
+        "hex": "8b4150c3",
+        "disasm": "mov eax,[ecx+0x50]"
+      },
+      {
+        "va": "0x00431260",
+        "bytes": 7,
+        "hex": "8b8160920100c3",
+        "disasm": "mov eax,[ecx+0x19260]"
+      },
+      {
+        "va": "0x0040A0E0",
+        "bytes": 7,
+        "hex": "8b81ac7f0400c3",
+        "disasm": "mov eax,[ecx+0x47fac]"
+      }
+    ]
+  },
+  "cumulative_p1": {
+    "matched": 30,
+    "total": 33,
+    "ratio": 0.909,
+    "failures": [
+      {
+        "va": "0x00404B70",
+        "reason": "fsincos — MSVC 前端不合成 x87 复合指令"
+      },
+      {
+        "va": "0x00417750",
+        "reason": "同上（scaled 版本）"
+      },
+      {
+        "va": "0x0049DC88",
+        "reason": "hotpatch 序言 — v142 生成 66 90，原版是 8b ff"
+      }
+    ]
+  },
+  "statistical_significance": {
+    "consecutive_perfect_batches": 2,
+    "batch3": "7/7 MATCH",
+    "batch4": "7/7 MATCH",
+    "combined": "14/14 = 100%",
+    "instruction_types_covered": [
+      "mov",
+      "lea",
+      "movss",
+      "and"
+    ],
+    "offset_range": "0x04 到 0x47FAC（跨越 6 个数量级）",
+    "conclusion": "v142 在「结构简单、无栈帧、纯字段访问」这类函数上的适用率是 100%。此前的 3 个失败都是完全不同的代码生成路径（fsincos / hotpatch），不是工具链整体问题。"
+  },
+  "g2_coverage": {
+    "before": 68,
+    "after": 75,
+    "total": 1675,
+    "ratio": "4.4776%"
+  },
+  "gate_status": {
+    "G1": "PASS",
+    "G2": "INCOMPLETE (75/1675)",
+    "G3": "PASS",
+    "G4": "PASS",
+    "G5": "INCOMPLETE",
+    "G6": "INCOMPLETE",
+    "G2+": "PASS (51/51)",
+    "P1": "30/33"
+  },
+  "tested_at": "2026-11-24T08:23:32.374Z"
+}

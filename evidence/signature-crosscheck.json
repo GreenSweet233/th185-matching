@@ -1,0 +1,74 @@
+{
+  "_comment": "上一轮结尾承诺的交叉验证：用「函数签名」（ret 操作数 + 参数个数）核对已匹配的 54 个函数，看是否存在不同签名被归到同一形状。",
+  "method": "对每个已声明地址取函数体，提取 (ret 操作数, 参数个数, 指令序列签名)，检查同一指令签名的函数是否 ret 也一致。",
+  "result_summary": {
+    "declared_functions": 54,
+    "distinct_shapes": 12,
+    "signature_ret_mismatches_within_shape": 0,
+    "conclusion": "形状分组本身没有问题——所有同形状的函数 ret 操作数一致"
+  },
+  "bug_found_by_crosscheck": {
+    "symptom": "0x004903B9 有 3 条指令，而 0x00490553/0x0049055C/0x0049055F 只有 2 条，但源码把它们写进了同一个函数",
+    "actual_binary": {
+      "0x004903B4": "jmp 0x00490A   <- 尾调用桩，属于另一个函数",
+      "0x004903B9": "xor eax, eax",
+      "0x004903BB": "ret"
+    },
+    "root_cause": "function_extent 的回溯规则里没有 jmp 停止条件。回溯从 0x004903B9 往上走，把 0x004903B4 的 jmp 当成普通指令继续往前，于是返回 0x004903B4，把只有 2 条指令的函数膨胀成 3 条，并吞掉了邻居的 jmp",
+    "why_dangerous": "这不是「多算一条指令」的小问题——它把一个独立函数和它的邻居合并，导致 ① 形状分组错误 ② G3 的结构统计错误 ③ 如果邻居的 jmp 目标不同，同一份源码要对应两个不同的二进制，永远匹配不上",
+    "fix": "回溯时若前一条是 jmp，则当前位置即为函数起点，不再往前",
+    "verification": {
+      "0x004903B9": "修复后 -> 0x004903B9 (2 条) xor ret",
+      "0x00490553": "不变 (2 条)",
+      "0x0044DA15": "仍正确回溯到 0x0044D9F0 (21 条)",
+      "0x00402A50": "本身是序言，不变 (8 条)",
+      "xor_group_after_fix": "4 个函数形状完全一致"
+    }
+  },
+  "new_capability_infer_signature": {
+    "purpose": "从函数体推导 (ret_bytes, param_count, convention)，作为形状分组的第二依据",
+    "why_needed": "只看指令序列会把签名不同的函数归到一起。实测 0x00417750 (ret 0xC, 3 参数) 和 0x004587B0 (ret 8, 2 参数) 指令序列几乎一样——都是 fsincos 极坐标，但多了一个 length 参数",
+    "results": [
+      {
+        "addr": "0x00417750",
+        "ret_bytes": 12,
+        "params": 3,
+        "convention": "thiscall"
+      },
+      {
+        "addr": "0x004587B0",
+        "ret_bytes": 8,
+        "params": 2,
+        "convention": "thiscall"
+      },
+      {
+        "addr": "0x00405830",
+        "ret_bytes": 4,
+        "params": 1,
+        "convention": "thiscall"
+      },
+      {
+        "addr": "0x00402A50",
+        "ret_bytes": 0,
+        "params": null,
+        "convention": "cdecl?"
+      }
+    ],
+    "limitation_stated": "`ret` 无操作数时表示「调用方清栈」，参数个数无法从 ret 推出，返回 params=null 而不是 0——0 会是假精度"
+  },
+  "coverage": {
+    "matched": 54,
+    "total": 1678,
+    "ratio": 0.032181,
+    "note": "本轮没有新增函数，只修了工具；覆盖率不变是因为修复后 4 个 xor 函数本就在源码里"
+  },
+  "gates": {
+    "G1": "PASS",
+    "G2": "INCOMPLETE (54/1678)",
+    "G3": "PASS",
+    "G4": "PASS",
+    "G5": "INCOMPLETE (compiler gap)",
+    "G6": "INCOMPLETE"
+  },
+  "tested_at": "2026-11-24T06:05:59.724Z"
+}

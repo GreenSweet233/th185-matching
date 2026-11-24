@@ -1,0 +1,25 @@
+{
+  "_comment": "AGENTS.md §6 G3：token/指令比、魔法常量数的上限。改这个文件等于改门槛，需人类批准。",
+  "g3": {
+    "token_per_instruction_max": 4,
+    "magic_constant_max": 0,
+    "_magic_constant_note": "0/1/-1/sizeof 派生/命名常量不计入。"
+  },
+  "g5": {
+    "optimization_levels": [
+      "-O0",
+      "-O2",
+      "-Os"
+    ],
+    "perturbations": [
+      "comment",
+      "format",
+      "rename_local",
+      "literal_to_constexpr"
+    ]
+  },
+  "toolchain": {
+    "lock_file": "toolchain.lock",
+    "_status": "未生成。见 AGENTS.md §0.2 的三档 build 问题。"
+  }
+}

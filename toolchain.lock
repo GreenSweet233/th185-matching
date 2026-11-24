@@ -1,0 +1,191 @@
+{
+  "_comment": "AGENTS.md §2：工具链只读、钉死。禁止为凑匹配改这里。认为必须改 → 停下写 conflict proposal。",
+  "_generated_at": "2026-11-24T04:41:52.573Z",
+  "target": {
+    "file": "th185.exe",
+    "version": "v1.00a",
+    "size": 883200,
+    "sha256": "76bbf844e962c16004b64f1b2ef3551593056baa43ea53b9a5df45ad731345c7",
+    "sections": {
+      ".text": {
+        "raw_offset": "0x400",
+        "raw_size": 711168,
+        "sha256": "09da18ef96ea7248da75791b51ad4bcb51177cee9bbf378fadfce7764f12335f"
+      },
+      ".rdata": {
+        "raw_offset": "0xADE00",
+        "raw_size": 98304,
+        "sha256": "93b54c51113d1927108ec1a258883a2ccc70666f1a6c48abfcab528a5904e665"
+      },
+      ".data": {
+        "raw_offset": "0xC5E00",
+        "raw_size": 65536,
+        "sha256": "e0de65f0e72d3421351b5e4dccb4cbb6162b1c41f949d077d3f006841f26ff57"
+      },
+      ".rsrc": {
+        "raw_offset": "0xD5E00",
+        "raw_size": 7168,
+        "sha256": "5b428bf3630c6a3171dfae95fadd193c6214b58465c373e3a1928b23d665c89a"
+      }
+    },
+    "pe": {
+      "machine": "0x014C (i386/PE32)",
+      "image_base": "0x00400000",
+      "entry_point_rva": "0x0009003B",
+      "timestamp": 1659144319,
+      "timestamp_utc": "2022-07-30T01:25:19Z",
+      "checksum": "0x000DE79F",
+      "sections_count": 4
+    }
+  },
+  "compiler": {
+    "_status": "VERIFIED_FOR_ONE_FUNCTION",
+    "_correction": "★ 修正（本轮）：此前把 27412 / 31328 / 31332 当作三个 VS2019 build 号，这是错的。\n\nRich Header 每个条目是 (comp_id, count)，comp_id 高 16 位 = build，低 16 位 = prodId。\n此前的解析把两个字段读反了，于是把 prodId 当成了 build。\n\n正确的表（build, prodId, count）：\n    261  27412  164      27412 = prodId，对应 VS2017 15.x 的 C++ 编译器 (2712)\n    265  31332   79      31332 = prodId，对应 VS2019 16.x\n    261  31328   47      31328 同为 VS2019 16.x\n    259  27412   33\n    260  27412   27\n    259  31328   23\n    260  31328   18\n    257  27412   12\n    ...\n\n按 prodId 归组：\n    prodId 27412  count=237  (VS2017 15.x 编译器)\n    prodId 31328  count= 89  (VS2019 16.x 编译器)\n    prodId 31332  count= 81  (VS2019 16.x 编译器)\n\n所以真实结论是：**两个 VS 世代共存（VS2017 + VS2019），不是三个 VS2019 补丁级**。\n31328 与 31332 是同一产品线的两个 prodId（可能分别是工具集与 CRT/库），\n而非两个不同编译器版本。",
+    "_consequence": "原先标为 BLOCKED 的理由（需要三套并存工具链）不成立。\n真实需求：VS2017 15.x 的 MSVC + VS2019 16.x 的 MSVC（两套，不是三套）。\n仍需验证：31328 与 31332 是否来自同一套工具集（若同源，则只需两套）。",
+    "rich_header_key": "0x0D2865FF",
+    "by_prod_id": {
+      "0": {
+        "unit_count": 202,
+        "interpretation": "未标记 / 链接器自身条目"
+      },
+      "21202": {
+        "unit_count": 2,
+        "interpretation": "SDK / import lib"
+      },
+      "27412": {
+        "unit_count": 237,
+        "minibuilds": [
+          257,
+          259,
+          260,
+          261,
+          262
+        ],
+        "interpretation": "VS2017 15.x MSVC (productId 2712)",
+        "confidence": "inferred — prodId 2712 对应 VS2017，需实测确认"
+      },
+      "30319": {
+        "unit_count": 3,
+        "interpretation": "SDK / import lib"
+      },
+      "30729": {
+        "unit_count": 7,
+        "interpretation": "SDK / import lib"
+      },
+      "31328": {
+        "unit_count": 89,
+        "minibuilds": [
+          253,
+          259,
+          260,
+          261
+        ],
+        "interpretation": "VS2019 16.x MSVC",
+        "confidence": "inferred"
+      },
+      "31332": {
+        "unit_count": 81,
+        "minibuilds": [
+          255,
+          258,
+          265
+        ],
+        "interpretation": "VS2019 16.x MSVC（可能与 31328 同源）",
+        "confidence": "inferred — 需确认 31328/31332 是否同一工具集"
+      },
+      "50727": {
+        "unit_count": 2,
+        "interpretation": "SDK / import lib"
+      }
+    },
+    "flags": {
+      "verified": "/c /MT /O2 /GS- /Oy-",
+      "_rationale": {
+        "/O2": "默认优化生成完整栈帧与局部变量，与原版不符（同一函数 139 字节 vs 68 字节）",
+        "/Oy-": "★ 关键 —— 禁用帧指针省略，恢复 push ebp/mov ebp,esp/pop ebp。原版多数函数有栈帧。",
+        "/Ot /Ob0 /Od": "都试过，无效。只有 /Oy- 精确恢复栈帧且不引入额外局部变量",
+        "/GS-": "逐个函数验证过：0x00402A50 函数体内 0 处引用 __security_cookie、0 处 xor eax,ebp",
+        "/MT": "静态 CRT（与 /GS- 一起测的，未单独验证哪个必需）"
+      },
+      "_call_conventions": {
+        "thiscall": "__fastcall + 哑 edx 参数（MSVC 不允许自由函数用 __thiscall）",
+        "stdcall": "直接 __stdcall，编译器自动生成 ret N",
+        "cdecl": "不用于本项目（多出 4 字节 mov ecx,[esp+4]）"
+      }
+    },
+    "linker": null,
+    "sdk_headers_hash": null,
+    "_verified": "★ 2026-11-24：MSVC v142 (19.29.30159) + /O2 + /MT + /GS- 对 0x00402A50 产出逐字节相同的 68 字节代码。\n工具集来源：从 C:\\ProgramData\\Microsoft\\VisualStudio\\Packages 的 .vsix 包直接解压到 D:\\MSVC142\\14.29.30133，不需要安装器和管理员权限。\n这解决了此前「UAC 无法提权」的阻塞。\n边界：只验证了 1 个函数，不能据此推断全部。原版 Rich Header 仍显示 prodId 27412（VS2017）+ 3132（VS2019）两代并存。",
+    "local": {
+      "path": "D:\\MSVC142\\14.29.30133",
+      "compiler": "cl.exe 19.29.30159 (x86)",
+      "include": [
+        "D:\\MSVC142\\14.29.30133\\include",
+        "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.19041.0\\ucrt",
+        "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.19041.0\\shared",
+        "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.19041.0\\um"
+      ],
+      "lib": "D:\\MSVC142\\14.29.30133\\lib\\x86",
+      "bin": "D:\\MSVC142\\14.29.30133\\bin\\Hostx86\\x86",
+      "_notes": [
+        "UCRT 的 math.h 在 Windows SDK（Kits\\10\\Include\\10.0.19041.0\\ucrt），不在 MSVC 工具集里。",
+        "只用 MSVC 的 include 会在 <math.h> 上失败 —— 这是 P1 验证脚本必须加 UCRT 路径的原因。"
+      ]
+    },
+    "_codegen_rules": [
+      "12 字节聚合类型必须用 struct 整体赋值 —— 触发 SSE2 movq+mov；逐字段赋值生成 3 条普通 mov",
+      "返回 int 用 xor eax,eax + cmp [mem],eax；返回 bool 用 cmp [mem],0。判据：原版有无 33c0 前缀",
+      "原版有栈帧不等于没优化 —— /Oy 单独控制帧指针，与优化级正交",
+      "**只有宏能让偏移折叠进 disp8** —— inline 函数生成 `add eax,[ebp+0xC]`，template 生成 `add eax,0x44`，只有 `#define` 文本替换才生成 `[ecx+0x44]` 的 disp8 编码"
+    ],
+    "_unresolved": [
+      {
+        "func": "0x00404B60",
+        "symptom": "原版 movss xmm0,[ecx]（SSE 返回 float），MSVC 只生成 fld dword [ecx]（x87）",
+        "tested": "14 种选项组合，全部 fld",
+        "status": "UNRESOLVED"
+      },
+      {
+        "func": "0x0049DC88",
+        "symptom": "原版有 mov edi,edi（hotpatch 序言）+ push 0x20/pop ecx",
+        "tested": "25 种选项组合，0 匹配",
+        "status": "UNRESOLVED",
+        "new_evidence_2026_11_24": {
+          "hotpatch_flag": "/hotpatch 确实插入 2 字节序言，但 MSVC v142 生成 `66 90`（2 字节 nop），原版是 `8b ff`（mov edi,edi）",
+          "implication": "间接支持原版可能含更早 VS 版本（v141/VS2017 的 /hotpatch 用 8bff）",
+          "caveat": "只有 1 个函数作为证据，不足以推翻 prodId 未定的结论",
+          "push_pop_test": "测了 4 种源码写法 × 4 种选项组合，0 个产生 `push 0x20 / pop ecx`"
+        }
+      },
+      {
+        "funcs": [
+          "0x00404B70",
+          "0x00417750"
+        ],
+        "symptom": "原版用 x87 fsincos 复合指令；MSVC 前端不合成 fsincos",
+        "tested": [
+          "_fsincos — 不存在该标识符",
+          "sinf+cosf — 67 字节，生成两次函数调用",
+          "__asm fsincos — 'fsincos' 是保留字"
+        ],
+        "note": "写 __asm 会违反 AGENTS.md §6 G4 的 inline-asm 禁令，不采用",
+        "status": "UNRESOLVED"
+      }
+    ]
+  },
+  "reproducibility": {
+    "forbid": [
+      "__DATE__",
+      "__TIME__",
+      "路径嵌入",
+      "随机 PDB GUID"
+    ],
+    "requirement": "连编两次 hash 一致",
+    "_status": "未验证（工具链未锁定）"
+  },
+  "open_questions": [
+    "三档 build 是否分别对应不同 .obj？需要按 .text 内函数边界反推归属。",
+    "./data 有 668596 字节 BSS，vtable 初值不可见，需靠构造函数写入序列反推。",
+    "链接顺序未知——影响函数排列，是 .text 整体 diff 的关键变量。"
+  ]
+}

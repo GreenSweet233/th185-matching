@@ -1,0 +1,74 @@
+{
+  "_comment": "AGENTS.md §12：门槛脚本必须能用变异测试证明自己会失败。本文件记录 G6 的自检结果与能力边界。",
+  "gate": "G6",
+  "script": "tools/check_evidence.py",
+  "key_evidence": {
+    "finding": "87 个 22 槽 vtable ↔ 87 张卡，间隔精确 0x5C",
+    "measured": {
+      "slot22_vtable_count": 87,
+      "card_table_count": 87,
+      "count_matches": true,
+      "expected_stride": "0x5C = (22+1)*4",
+      "observed_stride": "0x5C",
+      "stride_uniform": true,
+      "stride_gap_histogram": {
+        "0x5C": 86
+      },
+      "address_range": "0x004B6AB0..0x004B8998"
+    },
+    "why_this_matters": "两个独立的二进制结构（vtable 数组 / 卡表 CARD_DESC_LIST@0x4CA370）数量完全一致，且 vtable 间隔精确等于 (槽数+1)*4 —— 这是「87 个卡牌类各自有 22 个虚函数」的直接二进制证据，不是推测",
+    "independent_of": "不依赖编译器、不依赖 RTTI 名字、不依赖源码"
+  },
+  "vtable_scan": {
+    "total": 117,
+    "total_slots": 2164,
+    "slot_histogram": {
+      "2": 16,
+      "3": 1,
+      "6": 2,
+      "7": 2,
+      "8": 1,
+      "9": 1,
+      "16": 2,
+      "22": 87,
+      "28": 5
+    },
+    "method": "MSVC 布局：[vtable-4]=COL 指针（非 text 非零），[vtable+0..]=虚函数（text 内指针）。扫 .rdata 找「非 text 非零指针 + 后续连续 text 指针 >= 2」",
+    "col_in_rdata": "104 / 117 的 COL 落在 .rdata 内（剩余指向别处，未深究）"
+  },
+  "mutation_tests": [
+    {
+      "id": "M1-card-count-mismatch",
+      "mutation": "CARD_COUNT 87 -> 88",
+      "expected": "FAIL card_vtable_count_mismatch",
+      "actual": "count matches: False; [FAIL] card_vtable_count_mismatch",
+      "result": "PASS"
+    }
+  ],
+  "unsupported_requirements_honest": [
+    {
+      "requirement": "RTTI 类名比对",
+      "status": "UNSUPPORTED",
+      "measured": ".rdata 里正则 .\\?A[VU]...@@ 命中 0 处",
+      "conclusion": "原版用 /GR- 编译，二进制里没有 RTTI 类型名",
+      "consequence": "无法做「类名吻合」检查。22 槽 vtable 属于哪个类只能靠数量与间隔推断，不能靠名字确认"
+    },
+    {
+      "requirement": ".pdata 函数边界比对",
+      "status": "UNSUPPORTED",
+      "measured": "节表只有 .text / .rdata / .data / .rsrc，无 .pdata",
+      "conclusion": ".pdata 是 x64 的异常处理表；TH185 是 PE32 x86，本来就没有",
+      "consequence": "函数边界只能靠 call 目标 + ret 推断（check_witness 的 function_extent 就是这么做的）"
+    },
+    {
+      "requirement": "多反编译器交叉（>=2 一致）",
+      "status": "UNSUPPORTED",
+      "measured": "本机无 Ghidra / IDA / retdec（已全盘搜索 thvip/ 与常见安装路径）",
+      "conclusion": "只有 capstone 一个反汇编器",
+      "consequence": "类型/结构判断无法交叉验证，单一工具结论必须降级为 inferred"
+    }
+  ],
+  "dashboard_policy": "有 UNSUPPORTED 项时 gates_implemented.G6 记 false —— 否则会让人误以为 G6 完整了",
+  "note_on_pass": "脚本输出 [PASS] G6 只代表「能做的部分都成立」，不等于全部 G6 要求已满足。这句话打印在每次运行的末尾。",
+  "tested_at": "2026-11-24T05:08:37.123Z"
+}

@@ -1,0 +1,81 @@
+{
+  "_comment": "第三批 7 个极简访问器全部字节匹配（7/7）。P1 累计 23/26（88.5%）。这是对「v142 适用率」的一次关键采样。",
+  "date": "2026-11-24",
+  "batch3_results": {
+    "tested": 7,
+    "matched": 7,
+    "rate": "100%"
+  },
+  "new_matches": [
+    {
+      "va": "0x00406730",
+      "bytes": 4,
+      "hex": "8b4124c3",
+      "disasm": "mov eax,[ecx+0x24] ; ret",
+      "form": "int __fastcall f(void* s, void* d){ return *INT_AT(s,0x24); }"
+    },
+    {
+      "va": "0x004176D0",
+      "bytes": 4,
+      "hex": "8b4120c3",
+      "form": "同上，偏移 0x20"
+    },
+    {
+      "va": "0x00429A50",
+      "bytes": 4,
+      "hex": "8d411cc3",
+      "disasm": "lea eax,[ecx+0x1c] ; ret",
+      "form": "int* __fastcall f(void* s, void* d){ return INT_AT(s,0x1c); }"
+    },
+    {
+      "va": "0x00407E30",
+      "bytes": 7,
+      "hex": "8d8120060000c3",
+      "form": "同上，偏移 0x620"
+    },
+    {
+      "va": "0x00424480",
+      "bytes": 8,
+      "hex": "c7412800000000c3",
+      "disasm": "mov dword [ecx+0x28],0 ; ret",
+      "form": "*INT_AT(s,0x28) = 0;"
+    },
+    {
+      "va": "0x00404BD0",
+      "bytes": 6,
+      "hex": "b8689c5700c3",
+      "disasm": "mov eax,0x579C68 ; ret",
+      "form": "return (void*)0x00579C68u;"
+    },
+    {
+      "va": "0x00429AB0",
+      "bytes": 5,
+      "hex": "836140f0c3",
+      "disasm": "and dword [ecx+0x40],0xFFFFFFF0 ; ret",
+      "form": "*(unsigned*)INT_AT(s,0x40) &= 0xFFFFFFF0u;"
+    }
+  ],
+  "cumulative": {
+    "p1_matched": 23,
+    "p1_total": 26,
+    "ratio": 0.885,
+    "note": "26 个里 3 个失败，全部是已知未解问题（2 个 fsincos + 1 个 hotpatch 序言）"
+  },
+  "significance": {
+    "what_this_samples": "这批函数全是 2-3 条指令的极简访问器，覆盖了 mov/lea/movss/and 四种指令类型、多种偏移量",
+    "conclusion": "**v142 在这个子集上适用率 100%**，说明此前的失败不是工具链整体问题，而是特定代码生成路径的差异",
+    "implication": "可以继续用 v142 匹配「结构简单」的函数，遇到失败时逐个分析形状而不是怀疑工具链"
+  },
+  "gate_status": {
+    "G1": "PASS",
+    "G2": "INCOMPLETE (68/1675 = 4.06%)",
+    "G3": "PASS",
+    "G4": "PASS",
+    "G5": "INCOMPLETE",
+    "G6": "INCOMPLETE",
+    "G2+": "PASS (51/51)",
+    "P1": "23/26"
+  },
+  "note_on_g2_coverage": "G2 覆盖率从 59 涨到 68（+9 = 7 个新函数 + 2 个 fsincos 地址重算）",
+  "tested_at": "2026-11-24T08:14:07.217Z"
+}

@@ -1,0 +1,39 @@
+{
+  "_comment": "AGENTS.md §12 反作弊：门槛脚本必须能用变异测试证明自己会失败。本文件记录 G1 的自检结果。",
+  "gate": "G1",
+  "script": "tools/check_types.py",
+  "clang": "tools/emsdk/upstream/bin/clang.exe (clang 24.0.0git, target x86_64-pc-windows-msvc)",
+  "findings_during_development": [
+    {
+      "issue": "definitions_checked = 0 但报 PASS",
+      "cause": "clang 的 loc.file 是相对路径（include\\\\Enemy.hpp），而 in_scope 用绝对路径前缀比较，永远不匹配",
+      "fix": "改为按「规范化后是否落在 src/ 或 include/ 下」判定，不做前缀比较",
+      "lesson": "一个检查器如果不报错但什么都没查，比报错更危险"
+    }
+  ],
+  "mutation_tests": [
+    {
+      "id": "M1-offset",
+      "mutation": "lock.json 里 Enemy::hp.offset 12 -> 16",
+      "expected": "FAIL type_conflict",
+      "actual": "FAIL  Enemy::hp  offset locked=16 found=12",
+      "result": "PASS"
+    },
+    {
+      "id": "M2-type-size",
+      "mutation": "lock.json 里 Enemy::hp 锁定为 std::int16_t / size=2",
+      "expected": "FAIL type_conflict（size + type 两处）",
+      "actual": "FAIL  Enemy::hp size locked=2 found=4;  type locked='std::int16_t' found='std::int32_t'",
+      "result": "PASS"
+    },
+    {
+      "id": "M3-cross-tu",
+      "mutation": "新增 enemy_alt.cpp，同一 Enemy 多一个字段",
+      "expected": "FAIL cross_tu_mismatch",
+      "actual": "FAIL  type=Enemy  defined differently in 2 TU(s)  (2 variants)",
+      "result": "PASS"
+    }
+  ],
+  "bootstrap_state": "src/ 与 include/ 为空时输出 PASS 并明确说明 coverage=0，不把空仓库当成检查通过。",
+  "tested_at": "2026-11-24T04:46:51.275Z"
+}

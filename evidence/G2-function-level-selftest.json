@@ -1,0 +1,86 @@
+{
+  "_comment": "G2 首次在真实函数上运行的自检。AGENTS.md §12：门槛脚本必须证明自己会失败。",
+  "gate": "G2",
+  "first_real_target": {
+    "function": "0x00402A50",
+    "size_bytes": 44,
+    "instructions": 8,
+    "callers": 6,
+    "caller_addresses": [
+      "0x0045FB65",
+      "0x0045FB93",
+      "0x00460193",
+      "0x0046D910",
+      "0x0046FAC1",
+      "0x004700B2"
+    ],
+    "convention": "thiscall (ecx = this), no args, no return value",
+    "semantics": "递减 [ecx+0x8C]；变负时把 [ecx+0x8C] / [ecx+0x00] / [ecx+0xD4] 清零",
+    "disassembly": [
+      "0x00402A50  8b918c000000     mov edx, [ecx+0x8C]",
+      "0x00402A56  83ea01           sub edx, 1",
+      "0x00402A59  89918c000000     mov [ecx+0x8C], edx",
+      "0x00402A5F  791b             jns 0x402a7c",
+      "0x00402A61  c7818c00000000000000  mov dword [ecx+0x8C], 0",
+      "0x00402A6B  c70100000000     mov dword [ecx+0x00], 0",
+      "0x00402A71  c781d400000000000000  mov dword [ecx+0xD4], 0",
+      "0x00402A7B  c3               ret"
+    ]
+  },
+  "findings_during_development": [
+    {
+      "issue": "imm 0x00 见证 FAIL",
+      "cause": "0 在反汇编里只作为内存位移出现（[ecx]），从未作为立即数出现",
+      "fix": "引入独立的 disp 见证类型，与 imm 分开"
+    },
+    {
+      "issue": "disp 0x8C 见证 FAIL，报 'not found'",
+      "cause": "norm_value() 只处理 call/imm，新加的 disp 走默认分支返回字符串 '0x8C'，isinstance(val,int) 为 False",
+      "fix": "norm_value 的 kind 白名单加上 disp",
+      "lesson": "新增见证类型时要同步改三处：提取、norm_value、判定分支；漏一处就全 FAIL 且报错信息误导"
+    },
+    {
+      "issue": "假见证 disp 0x7F8 被误判为 PASS",
+      "cause": "见证按**全局** .text 集合判定。0x7F8 在别的函数里出现过，全局集合就有它",
+      "measured": {
+        "target_function_displacements": [
+          "0x8C",
+          "0xD4"
+        ],
+        "0x7F8_in_target_function": false,
+        "0x7F8_elsewhere_in_text": true
+      },
+      "fix": "改为按函数地址范围判定（facts_for_range + function_extent）",
+      "lesson": "见证的意义是「这个函数的这段码里出现了它」。用全局集合判定，几乎任何偏移都能通过，G2 就是摆设"
+    },
+    {
+      "issue": "witness declarations 恒为 0",
+      "cause": "WITNESS_RE 写作 //\\s*@witness\\s+(\\w+)\\s+(.+)$，要求 @witness 后先有一个 \\w+ 词再跟空白。但 'func=0x00402A50' 里 func 后面是 '='，不是空白，整条不匹配",
+      "fix": "改为 //\\s*@witness\\s+(.+)$ 捕获到行尾，再按 key=value 解析",
+      "lesson": "正则对格式的假设要用实际样本验证一次，否则会静默不匹配"
+    }
+  ],
+  "mutation_tests": [
+    {
+      "id": "M1-real-function-witnesses",
+      "mutation": "func=0x00402A50 + disp 0x8C + disp 0xD4（均为真实见证）",
+      "expected": "witnessless = 0",
+      "actual": "witness declarations: 3 items in 1 function, witnessless: 0",
+      "result": "PASS"
+    },
+    {
+      "id": "M2-fake-disp-globally-present",
+      "mutation": "加 disp 0x7F8（全局 .text 存在，但不在 0x00402A50 函数内）",
+      "expected": "FAIL",
+      "actual": "FAIL witness_not_found: 0x00402A50::disp 0x7F8 -> memory displacement not inside this function",
+      "result": "PASS",
+      "significance": "证明函数范围判定有效，不是全局集合放水"
+    }
+  ],
+  "source_state": {
+    "src/include": "include/Timer.hpp + src/Timer.cpp —— 第一个真实 Phase A 重建",
+    "no_struct_decision": "本函数只碰 +0x00/+0x8C/+0xD4 三个字段，三者之间内容无证据。按 §0 第 3 条与 §8 第 1 条，**不定义假 struct**（带 pad 成员会 G2 FAIL 且 §6 G4 禁止 pad），改用具名偏移常量 + void*，偏移关系标 unresolved。",
+    "g1_state": "definitions checked = 0 是正确行为——我的实现里确实没有 struct 定义，不假装有"
+  },
+  "tested_at": "2026-11-24T05:02:00.764Z"
+}

@@ -1,0 +1,88 @@
+{
+  "_comment": "★★★ 第一个含 call 的函数字节匹配成功。同时推翻上一轮的错误结论（pop ecx 是优化级差异，不是版本差异）。",
+  "date": "2026-11-24",
+  "milestone": {
+    "function": "0x0048F711",
+    "callers": 202,
+    "bytes": "558becff7508e863090000595dc3",
+    "result": "MATCH",
+    "significance": "第一个含 call 的函数匹配成功，打破了「只能匹配叶子函数」的限制"
+  },
+  "three_breakthroughs": {
+    "1_optimization_level_not_version": {
+      "wrong_hypothesis": "上一轮说 `pop ecx vs add esp,4` 是编译器版本差异",
+      "correct_answer": "是优化级差异。原版用 /Os（优化体积），不是 /O2（优化速度）",
+      "evidence": {
+        "/O2": "558becff7508e800000000 83c404 33c0 5dc3   → add esp,4",
+        "/O1": "558becff7508e800000000 59 33c0 5dc3        → pop ecx，但有 xor eax,eax",
+        "/Os": "558becff7508e800000000 59 5dc3             → MATCH",
+        "/Ox": "558becff7508e800000000 83c404 33c0 5dc3   → add esp,4",
+        "/Od": "558bec8b450850e800000000 83c404 33c0 5dc3 → add esp,4"
+      },
+      "meta_lesson": "**「某个选项不生成 X」≠「MSVC 不生成 X」—— 必须穷举 /O1 /O2 /Ox /Os /Od 五个优化级。** 上一轮只测 /O2 就归因到版本，与之前 Rich Header 的错误同类：基于不完整采样做结构性判断。"
+    },
+    "2_per_function_flags": {
+      "finding": "原版不同编译单元可能用不同优化级（/O2 和 /Os 并存）",
+      "implementation": "check_bytes.py 的 targets 增加第 6 个字段 per-function flags",
+      "usage": "(\"0x0048F711\", 0x0048F711, \"FieldAccess.cpp\", \"forward_to_cpu_probe\", False, \"/MT /Os /GS- /Oy-\")"
+    },
+    "3_relocation_aware_comparison": {
+      "problem": "call rel32 在未链接的 .obj 里是占位值（e800000000）",
+      "measurement": {
+        "our_bytes": "558bec ff7508 e8 00 00 00 00 59 5d c3",
+        "original": "558bec ff7508 e8 63 09 00 00 59 5d c3",
+        "relocation_entry": "va=0x0007（正好在 e8 后一字节）type=REL32_1",
+        "difference_scope": "只有 4 字节 rel32，前 7 字节和后 3 字节完全一致"
+      },
+      "solution": "parse_coff_relocs() 解析 COFF 重定位表，bytes_match_with_relocs() 把重定位占位区排除在比较之外",
+      "why_not_link": "P1 比对单个函数不需要真的链接 —— 只需知道哪些字节是占位，排除即可"
+    }
+  },
+  "code_form": {
+    "source": [
+      "extern \"C\" void th185_CpuFeatureProbe(int features);",
+      "",
+      "void __cdecl forward_to_cpu_probe(int features) {",
+      "    th185_CpuFeatureProbe(features);",
+      "}"
+    ],
+    "flags": "/MT /Os /GS- /Oy-",
+    "notes": [
+      "★ 必须 /Os 而非 /O2 —— 只有 /Os 生成 pop ecx",
+      "★ 必须 cdecl 且返回 void —— 末尾是 c3(ret) 而非 c20400(ret 4)",
+      "★ 加 __declspec(noreturn) 会生成 cc(int3) 或不同结尾，不对"
+    ]
+  },
+  "callee_identity": {
+    "va": "0x0049007F",
+    "size": 473,
+    "identity": "CPU 特性探测函数（含 cpuid 指令，检测 SSE/AVX 等）",
+    "callers": 1,
+    "note": "只声明不实现 —— P1 只比对调用方的代码，不需要被调方的实现"
+  },
+  "cumulative_evidence_reassessment": {
+    "before": "三条证据指向「原版含更早 VS 版本」",
+    "after": "**只剩两条**",
+    "remaining": [
+      "① fsincos：MSVC 前端不合成 x87 复合指令（14 种选项全试过）",
+      "② hotpatch 序言：v142 用 66 90，原版用 8b ff（/hotpatch 实测）"
+    ],
+    "overturned": "③ pop ecx —— 已证明是 /Os 优化级差异，不是版本差异"
+  },
+  "bug_found_and_fixed": {
+    "symptom": "加完 per-function flags 后，总数从 30/33 掉到 25/34（回归 9 个）",
+    "root_cause": "`--flags` 的**默认值**是 `/MT /O2 /GS-`，缺少 `/Oy-`。之前一直显式传参所以没暴露，这次跑 `python tools/check_bytes.py` 没传就踩了",
+    "fix": "默认值改为 `/MT /O2 /GS- /Oy-`",
+    "lesson": "**默认值也是代码，也会错。** 显式传参掩盖了默认值的问题。"
+  },
+  "current_p1": {
+    "matched": 31,
+    "total": 34,
+    "ratio": 0.912,
+    "failures": [
+      "0x00404B70 / 0x00417750  fsincos",
+      "0x0049DC88                hotpatch 序言"
+    ]
+  },
+  "tested_at": "2026-11-24T08:34:24.419Z"
+}

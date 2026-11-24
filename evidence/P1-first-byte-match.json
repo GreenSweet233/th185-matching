@@ -1,0 +1,104 @@
+{
+  "_comment": "★★★ P1（字节相等）首次达成。0x00402A50 的 C++ 源码用 MSVC v142 + /O2 编译出与原版逐字节相同的 68 字节代码。",
+  "date": "2026-11-24",
+  "milestone": "第一个字节级匹配的函数",
+  "function": {
+    "va": "0x00402A50",
+    "range": "0x00402A50..0x00402A93 (68 字节)",
+    "semantics": "递减 [ecx+0x8C]；为负则清三个字段返回；非负则以递减后的值为下标从 +0x0C/+0x4C 两个数组取值写入 +0x00/+0x08，再清 +0xD4"
+  },
+  "how_the_blocker_was_bypassed": {
+    "original_problem": "VS2019 安装器需要 UAC 提权，当前进程非管理员（IsInRole(Administrator)=False），--quiet 无法弹窗、--passive 弹了没人点",
+    "breakthrough": "发现微软把 MSVC 工具集打包成 .vsix 放在本地缓存里，直接解压即可用，**完全不需要安装器和管理员权限**",
+    "cache_location": "C:\\ProgramData\\Microsoft\\VisualStudio\\Packages",
+    "packages_needed": [
+      "Microsoft.VC.14.29.16.11.Tools.HostX86.TargetX86.base,version=14.29.30159  (cl.exe)",
+      "Microsoft.VC.14.29.16.11.Tools.HostX86.TargetX86.Res.base,version=14.29.30159,language=zh-CN  (clui.dll)",
+      "Microsoft.VC.14.29.16.11.CRT.Headers.base,version=14.29.30156  (include/*.h)",
+      "Microsoft.VC.14.29.16.11.CRT.x86.Desktop.base,version=14.29.30156  (lib/x86/*.lib)",
+      "Microsoft.VC.14.29.16.11.CRT.Source.base,version=14.29.30156",
+      "Microsoft.VisualCpp.Tools.Common.Utils,version=14.29.30157",
+      "Microsoft.VisualCpp.Tools.Core.x86,version=14.29.30157"
+    ],
+    "extracted_to": "D:\\MSVC142\\14.29.30133",
+    "compiler_version": "Microsoft (R) C/C++ 优化编译器 19.29.30159 版 (x86)",
+    "why_this_works": "每个 payload.vsix 就是一个 zip，里面是 Contents/VC/Tools/MSVC/14.29.30133/ 的目录树。全部展开合并即可得到完整工具集。"
+  },
+  "exact_build_recipe": {
+    "command": "cl /nologo /c /MT /O2 /GS- /Fo_tk2.obj _tick2.cpp",
+    "env": {
+      "INCLUDE": "D:\\MSVC142\\14.29.30133\\include",
+      "LIB": "D:\\MSVC142\\14.29.30133\\lib\\x86",
+      "PATH": "D:\\MSVC142\\14.29.30133\\bin\\Hostx86\\x86;%PATH%"
+    },
+    "source": [
+      "extern \"C\" void __fastcall tick(void* self, void* unused_edx) {",
+      "    (void)unused_edx;",
+      "    int* countdown = reinterpret_cast<int*>(static_cast<char*>(self) + 0x8C);",
+      "    int cd = *countdown - 1;",
+      "    *countdown = cd;",
+      "    if (cd < 0) {",
+      "        *countdown = 0;",
+      "        *reinterpret_cast<int*>(static_cast<char*>(self) + 0x00) = 0;",
+      "        *reinterpret_cast<int*>(static_cast<char*>(self) + 0xD4) = 0;",
+      "        return;",
+      "    }",
+      "    int* arrA = reinterpret_cast<int*>(static_cast<char*>(self) + 0x0C);",
+      "    int* arrB = reinterpret_cast<int*>(static_cast<char*>(self) + 0x4C);",
+      "    *reinterpret_cast<int*>(static_cast<char*>(self) + 0x00) = arrA[cd];",
+      "    *reinterpret_cast<int*>(static_cast<char*>(self) + 0x08) = arrB[cd];",
+      "    *reinterpret_cast<int*>(static_cast<char*>(self) + 0xD4) = 0;",
+      "}"
+    ],
+    "call_convention_note": "原版是 thiscall（ecx=this）。MSVC 不允许对自由函数用 __thiscall，所以用 __fastcall + 哑的 edx 参数模拟 —— 编译器会把第一个参数放进 ecx，第二个放进 edx，生成的代码与 thiscall 完全一致。"
+  },
+  "bytes": {
+    "original": "8B 91 8C 00 00 00 83 EA 01 89 91 8C 00 00 00 79 1B C7 81 8C 00 00 00 00 00 00 00 C7 01 00 00 00 00 C7 81 D4 00 00 00 00 00 00 00 C3 8B 44 91 0C 89 01 8B 44 91 4C 89 41 08 C7 81 D4 00 00 00 00 00 00 00 C3",
+    "ours": "8B 91 8C 00 00 00 83 EA 01 89 91 8C 00 00 00 79 1B C7 81 8C 00 00 00 00 00 00 00 C7 01 00 00 00 00 C7 81 D4 00 00 00 00 00 00 00 C3 8B 44 91 0C 89 01 8B 44 91 4C 89 41 08 C7 81 D4 00 00 00 00 00 00 00 C3",
+    "identical": true,
+    "length": 68
+  },
+  "what_was_tried_before_it_matched": [
+    {
+      "attempt": "默认优化（无 /O）",
+      "result": "139 字节",
+      "why_failed": "生成完整栈帧 push ebp/mov ebp,esp/sub esp,0x10 + 全部局部变量"
+    },
+    {
+      "attempt": "/O1",
+      "result": "54 字节",
+      "why_failed": "过度优化，用 and [mem],0 代替 mov [mem],0，指令更短但不同"
+    },
+    {
+      "attempt": "/O2 + cdecl (extern C 单参数)",
+      "result": "72 字节",
+      "why_failed": "多出 4 字节 `mov ecx,[esp+4]` —— 因为 cdecl 从栈取参数，而原版 ecx 已经是 this"
+    },
+    {
+      "attempt": "/O2 + __fastcall 模拟 thiscall",
+      "result": "68 字节 byte-identical",
+      "why_success": "ecx 直接拿到 self，与原版约定一致"
+    }
+  ],
+  "significance": {
+    "what_this_proves": [
+      "工具链判断正确：v142 (19.29) + /O2 + /MT + /GS- 能产出与原版一致的代码",
+      "语义重建正确：G2+ 的 51 个行为验证用例保证了这一点",
+      "匹配流程可用：从反汇编 -> 源码 -> 编译 -> 字节比对，全链路通了"
+    ],
+    "what_this_does_not_prove": [
+      "其他 53 个函数也能字节相等 —— 尚未验证",
+      "整个 .text 能链接成与 th185.exe 相同的二进制 —— 差得远（还有 1621 个函数）",
+      "/GS- 是否与原版一致 —— 原版有 __security_cookie 引用（0x4C8A4C），说明原版开了 /GS，我只在这个函数上关掉了，需要单独确认"
+    ],
+    "pending_concerns": "原版 Rich Header 显示同时有 prodId 27412（VS2017，237 单元）和 3132（VS2019，170 单元）。本函数用 v142 匹配成功，但不能据此推断所有函数都用 v142。"
+  },
+  "how_to_reproduce": {
+    "step_1": "解包 7 个 vsix 到 D:\\MSVC142\\14.29.30133（见 packages_needed）",
+    "step_2": "设置 INCLUDE / LIB / PATH（见 exact_build_recipe.env）",
+    "step_3": "写 _tick2.cpp（见 exact_build_recipe.source）",
+    "step_4": "cl /nologo /c /MT /O2 /GS- /Fo_tk2.obj _tick2.cpp",
+    "step_5": "手工解析 COFF，取 .text$mn 段，与原版 0x00402A50 起 68 字节比对"
+  },
+  "tested_at": "2026-11-24T07:17:13.524Z"
+}

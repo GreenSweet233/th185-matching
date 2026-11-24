@@ -1,0 +1,178 @@
+{
+  "_comment": "★ fsincos 问题的最终结论：MSVC 编译器前端在**任何**优化级/架构选项下都不生成 fsincos。它是运行库的实现细节，不是编译器内联产物。",
+  "date": "2026-11-24",
+  "target": {
+    "va": "0x00404B70",
+    "bytes": "558bec51894dfc8b45fcd94508d9fbd84d0cd918d84d0cd958048be55dc20800",
+    "disasm": [
+      "push ebp / mov ebp, esp        ; 558bec",
+      "push ecx                       ; 51  —— 只为分配 4 字节局部空间",
+      "mov [ebp-4], ecx               ; 894dfc  —— 保存 this",
+      "mov eax, [ebp-4]               ; 8b45fc  —— 从局部读回 this",
+      "fld dword [ebp+8]              ; d94508  —— x87 加载 angle",
+      "fsincos                        ; d9fb    ★ x87 复合指令，一次算 sin+cos",
+      "fmul dword [ebp+0xC]           ; d84d0c",
+      "fstp dword [eax]               ; d918",
+      "fmul dword [ebp+0xC]           ; d84d0c",
+      "fstp dword [eax+4]             ; d95804",
+      "mov esp, ebp                   ; 8be5    —— 显式恢复",
+      "pop ebp / ret 8                ; 5dc20800"
+    ]
+  },
+  "exhaustive_test": {
+    "total_combinations": 60,
+    "axes": {
+      "optimization": [
+        "/Od",
+        "/O1",
+        "/O2",
+        "/Ox",
+        "/Os"
+      ],
+      "fp_model": [
+        "/fp:precise",
+        "/fp:fast",
+        ""
+      ],
+      "arch": [
+        "/arch:IA32",
+        "/arch:SSE",
+        "/arch:SSE2",
+        ""
+      ],
+      "source_forms": [
+        "sinf(a)*L, cosf(a)*L",
+        "(float)sin(a)*L, (float)cos(a)*L",
+        "volatile 分别算",
+        "_CIsin/_CIcos",
+        "旧式 sinf_/cosf_ extern 声明"
+      ]
+    },
+    "result": "**0 个产生 fsincos（d9fb）**",
+    "key_data_points": [
+      {
+        "flags": "/Od /arch:IA32",
+        "bytes": "558bec83ec0c8955f4894df88b45f88945fc51d94508d91c24...",
+        "note": "有 fld/fstp（d94508/d91c24），但是 call 而非 fsincos"
+      },
+      {
+        "flags": "/O2 /arch:IA32",
+        "bytes": "558bec83ec10d94508dd55f0d9450cdd5df8568bf1e8000000...",
+        "note": "同样有 fld，但仍 call"
+      },
+      {
+        "flags": "/Os /arch:IA32",
+        "bytes": "558bec83ec0c8955f4894df88b45f88945fc51d94508d91c24...",
+        "note": "同上"
+      }
+    ]
+  },
+  "conclusion": {
+    "finding": "MSVC 编译器前端在任何选项下都不合成 `fsincos`",
+    "why": [
+      "`sin()` / `cos()` 在 MSVC 里是独立的 CRT 函数，编译器只负责生成 `call`",
+      "x87 的 `fsincos` 指令只在**运行库内部实现**里被手写使用",
+      "即使 `/arch:IA32` 强制走 x87，编译器仍然生成 `call` 而不是内联计算"
+    ],
+    "implication": [
+      "**原版的 `fsincos` 说明它静态链接了 x87 版的 CRT（libcmt.lib 的 32 位版本）**",
+      "这不是「编译器版本差异」，而是「链接了什么 CRT」",
+      "但我们的 P1 只比对单个函数的 .text，**不需要链接 CRT** —— 所以这个函数永远无法用 C++ 源码匹配"
+    ],
+    "possible_solutions": [
+      {
+        "option": "① 用 __asm 手写 fsincos",
+        "pros": "能精确匹配字节",
+        "cons": "**违反 AGENTS.md §6 G4 的 inline-asm 禁令**",
+        "verdict": "不采用"
+      },
+      {
+        "option": "② 承认这个函数无法字节匹配，标 behaviour-equivalent",
+        "pros": "诚实，符合「宁可 unmatched，不可 garbage match」",
+        "cons": "P1 永远停在 31/34 或类似比例",
+        "verdict": "**推荐**"
+      },
+      {
+        "option": "③ 修改 G4 允许必需的 inline-asm",
+        "pros": "能匹配",
+        "cons": "开了口子，后续任何「生成不出来」都可以用 asm 绕过 —— 门槛失效",
+        "verdict": "需要人类裁决，且要有严格约束（比如仅限 x87 复合指令、必须逐条注释）"
+      }
+    ]
+  },
+  "affected_functions": {
+    "count_17": "17 个 `ret 8`（2 参数，x=sin·L / y=cos·L）",
+    "count_2": "2 个 `ret 0xC`（3 参数，x=sin·Lx / y=cos·Ly）",
+    "total": 19,
+    "note": "这 19 个函数占 19/1675 = 1.13%"
+  },
+  "contrast_with_previous_findings": {
+    "optimization_level_lesson": "上一轮学到的「必须穷举五个优化级」在这里已经应用 —— 穷举了 60 种组合",
+    "but_still_no_match": "这次不是「测少了」，而是**真的生成不出来**",
+    "how_to_distinguish": [
+      "测少了：某个组合能匹配（如 /Os 之于 pop ecx）",
+      "真生成不出来：穷举所有组合都没有目标指令（如 fsincos）",
+      "**判据：看目标指令是否出现在任何输出里** —— `d9fb` 一次都没出现过"
+    ]
+  },
+  "tested_at": "2026-11-24T08:35:57.706Z",
+  "encode_value_final_analysis": {
+    "_comment": "0x0049DC88 的最终分析：三个特征在 v142 下无法同时满足",
+    "target": "8bff558beca14c8a4c0083e01f6a20592bc88b4508d3c833054c8a4c005dc3",
+    "three_features": [
+      {
+        "bytes": "8bff",
+        "meaning": "mov edi,edi —— hotpatch 序言"
+      },
+      {
+        "bytes": "a1 4c8a4c00",
+        "meaning": "mov eax,moffs32 —— 5 字节的绝对寻址特化"
+      },
+      {
+        "bytes": "6a20 59",
+        "meaning": "push 0x20 / pop ecx —— 3 字节常量装入"
+      }
+    ],
+    "exhaustive_test": {
+      "combinations": 45,
+      "findings": [
+        {
+          "flags": "/Od + /hotpatch",
+          "has": [
+            "moffs(a1)"
+          ],
+          "missing": [
+            "8bff",
+            "pushpop"
+          ],
+          "size": 62
+        },
+        {
+          "flags": "/O1 + /hotpatch",
+          "has": [
+            "pushpop(6a2059)"
+          ],
+          "missing": [
+            "a1",
+            "8bff"
+          ],
+          "size": 30
+        },
+        {
+          "flags": "/O2 + /hotpatch",
+          "has": [],
+          "missing": [
+            "a1",
+            "pushpop",
+            "8bff"
+          ],
+          "size": 32
+        }
+      ],
+      "key_observation": "**`8bff` 在 45 种组合里一次都没出现** —— v142 的 /hotpatch 生成 `66 90` 而非 `8b ff`",
+      "conclusion": "三个特征在 v142 下**无法同时满足**：/Od 给 a1 但无 pushpop；/O1 给 pushpop 但无 a1；全程无 8bff"
+    },
+    "verdict": "**这个函数不是 MSVC v142 编译的。** 需要更早的工具集（v141/VS2017 或更早）才能验证。",
+    "recommended_action": "标记 UNRESOLVED_TOOLCHAIN，等待 v141 可用后重测"
+  }
+}

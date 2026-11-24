@@ -1,0 +1,66 @@
+{
+  "_comment": "encode_value 的 hotpatch 序言调查：/hotpatch 有效但 v142 生成 66 90，原版是 8b ff。同时记录宏统一改动。",
+  "date": "2026-11-24",
+  "part_1_macro_unification": {
+    "what": "把 Timer.cpp 和 FieldAccess.cpp 里所有 inline 辅助函数统一改成宏",
+    "why": "上一轮发现只有宏能让偏移折叠进 disp8（见 P3-macro-required-for-disp.json）。inline 版本虽然当前也能匹配，但规则不一致。",
+    "verification": {
+      "0x00402A50": "MATCH 68 字节（改宏前后都是）",
+      "全体": "16/19 不变，无回归"
+    },
+    "conclusion": "宏与 inline 在 0x00402A50 上等价，但统一用宏可以避免未来踩坑"
+  },
+  "part_2_encode_value_hotpatch": {
+    "function": "0x0049DC88",
+    "target": "8bff 558bec a1 4c8a4c00 83e01f 6a20 59 2bc8 8b4508 d3c8 33054c8a4c00 5d c3",
+    "disasm": [
+      "mov edi, edi            ; 8bff  <- hotpatch 2 字节 nop（mov edi,edi 形式）",
+      "push ebp / mov ebp, esp",
+      "mov eax, [0x4C8A4C]",
+      "and eax, 0x1F",
+      "push 0x20 / pop ecx     ; 6a20 59  <- 比 mov ecx,0x20 (b920000000) 短 3 字节",
+      "sub ecx, eax",
+      "mov eax, [ebp+8]        ; cdecl 参数",
+      "ror eax, cl",
+      "xor eax, [0x4C8A4C]",
+      "pop ebp / ret"
+    ],
+    "finding_hotpatch": {
+      "flag_works": "/hotpatch 确实插入 2 字节序言",
+      "but_different": "MSVC v142 生成 `66 90`（2 字节 nop），原版是 `8b ff`（mov edi,edi）",
+      "tested": [
+        {
+          "flags": "/MT /O2 /GS- /Oy- /hotpatch",
+          "bytes_prefix": "6690 558bec..."
+        },
+        {
+          "flags": "/MT /O1 /GS- /Oy- /hotpatch",
+          "bytes_prefix": "6690 558bec..."
+        },
+        {
+          "flags": "/MT /Od /GS- /hotpatch",
+          "bytes_prefix": "6690 558bec..."
+        }
+      ],
+      "conclusion": "**v142 的 /hotpatch 用 66 90，更早版本用 8b ff。** 这与 Rich Header 显示的 prodId 差异相符——原版可能混合了不同编译器版本。"
+    },
+    "finding_push_pop": {
+      "why_special": "`push 0x20 / pop ecx` 是 3 字节，`mov ecx,0x20` 是 5 字节。MSVC 在 /O2 下会选择 mov 而非 push/pop（因为 push/pop 有依赖延迟）",
+      "when_generated": "只在极低优化级（/Od）或手写汇编中出现",
+      "tested_source_forms": [
+        "标准 rotate 写法",
+        "_rotl intrinsic",
+        "volatile 强制变量",
+        "分步赋值"
+      ],
+      "result": "0 个组合产生 push 0x20/pop ecx"
+    },
+    "status": "UNRESOLVED — 需要更早的 MSVC 版本（v141/VS2017）才能验证 /hotpatch 是否产生 8bff"
+  },
+  "implication_for_rich_header": {
+    "new_evidence": "v142 的 /hotpatch 用 66 90，而原版用 8b ff，这**间接支持**了原版含有更早 VS 版本的判断",
+    "but_caveat": "只有 1 个函数作为证据，且 encode_value 的 push/pop 也可能有其它解释",
+    "action": "不修改 AGENTS.md 的现有结论（prodId 含义未定），但把这条线索记进 toolchain.lock 的 _unresolved"
+  },
+  "tested_at": "2026-11-24T08:04:13.124Z"
+}

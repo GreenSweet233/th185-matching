@@ -1,0 +1,87 @@
+{
+  "_comment": "反汇编扫描方法的实测对比与遗留局限。递归下降与启发式两种路线都试过，记录为什么选现状。",
+  "problem": {
+    "symptom": "线性扫描（skipdata）会把 .text 内嵌的数据当代码，导致后续函数起点错位",
+    "example": {
+      "address": "0x00407080",
+      "raw_bytes": "55 8B EC 83 EC 0C 8B 45 08 53 56 57",
+      "correct_disasm": "push ebp / mov ebp, esp / sub esp, 0xC / ...",
+      "what_linear_scan_did": [
+        "0x0040707D  6f        outsd",
+        "0x0040707F  00558b    add byte ptr [ebp-0x75], dl   <- 把 55 8B 吃掉了",
+        "0x00407082  ec        in al, dx                     <- 错位产物"
+      ],
+      "detectability": "`in al, dx` 是端口 I/O 指令，不可能出现在普通函数开头 —— 这是可检测的信号",
+      "impact": "0x00407080 有 80+ 个调用方，是热函数，却从错误位置被切开"
+    }
+  },
+  "attempts": [
+    {
+      "attempt": "1. skipdata 全段线性扫描",
+      "result": "覆盖 100% 字节，但 4 个已知错位",
+      "verdict": "错位会污染所有后续统计"
+    },
+    {
+      "attempt": "2. 跳转表检测 + 跳过",
+      "detection_rule": "连续 >= 3 个 4 字节值都落在 .text 地址范围内",
+      "found": "85 个跳转表 / 1624 个表项",
+      "result": "4 个已知错位 -> 0 个；但仍有 2 处 I/O 指令残留",
+      "verdict": "有效但不够"
+    },
+    {
+      "attempt": "3. 数据区检测（递增序列 / 高频重复字节）",
+      "detection_rule": "连续 >= 8 字节严格递增 1，或 >= 8 字节相同（排除 0xCC int3 填充）",
+      "found": "23 个数据区 / 1504 字节",
+      "result": "I/O 残留 2 处（0x00434692 in al,dx、0x0049CEA2 into）",
+      "verdict": "仍有漏网"
+    },
+    {
+      "attempt": "4. 序言锚定（55 8B EC 必为函数起点）",
+      "detection_rule": "找到所有 `55 8B EC`，凡不在已标记数据区内的，把它之前的 16 字节标为数据",
+      "result": "★ 修好 1 处（0x00434690）却引入 31 处新错位 —— 异常指令从 2 涨到 32",
+      "verdict": "**净收益为负，已撤除**",
+      "lesson": "启发式每修一处就破坏别处，这类方法的收益不单调"
+    },
+    {
+      "attempt": "5. 递归下降（只从已知入口跟跳转）",
+      "result": "指令数 203967 -> 146850（少 28%），I/O 残留降到 1 处（0x00492B50 pushal）",
+      "problem": "丢失 57134 条指令。原因：0x00434690 不是任何 call 的目标（只通过虚表/函数指针调用），静态 call 目标分析够不到",
+      "verdict": "**不能单独用** —— MSVC /Gy 产生大量只经间接调用的函数"
+    }
+  ],
+  "current_state": {
+    "chosen": "跳转表检测 + 数据区检测（尝试 2 + 3），撤除序言锚定",
+    "instruction_count": 203967,
+    "known_misalignments": 2,
+    "list": [
+      {
+        "va": "0x00434692",
+        "wrong": "in al, dx",
+        "cause": "字节查表的非对齐尾部"
+      },
+      {
+        "va": "0x0049CEA2",
+        "wrong": "into",
+        "cause": "未查明"
+      }
+    ],
+    "correctly_handled": [
+      "0x00407080",
+      "0x0041CDB0",
+      "0x00423EC0",
+      "0x0044ACF0"
+    ]
+  },
+  "why_not_solved_completely": {
+    "reason": "「这段字节是代码还是数据」在没有符号表的情况下无法从静态信息完全判定。",
+    "heuristic_limitation": "任何启发式都会漏；而每加一条规则都可能破坏别处的对齐（尝试 4 就是证据）",
+    "recursive_limitation": "递归下降能保证不把数据当代码，但会漏掉只经间接调用到达的函数（本二进制有 57134 条指令属于此类）",
+    "proper_solution": "需要 .pdata（PE32 x86 没有）或完整 CFG 恢复（需要先知道所有函数入口，循环依赖）"
+  },
+  "impact_on_matching": {
+    "current": "2 处错位影响 2 个函数范围（1678 个 call 目标中的 2 个）",
+    "ratio": "约 0.12%",
+    "honest_statement": "「1678 个函数」这个分母本身是 count(直接 call 目标去重)，不是真实函数数。真实函数数只会更多（间接调用的够不到）。所以覆盖率百分比是下界估计，不是精确值。"
+  },
+  "tested_at": "2026-11-24T06:24:42.131Z"
+}

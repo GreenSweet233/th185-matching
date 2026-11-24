@@ -1,0 +1,87 @@
+{
+  "_comment": "★ G2+ 抓到两个真实语义错误。这证明了行为验证的必要性——静态门槛全过而语义是错的。",
+  "date": "2026-11-24",
+  "trigger": "把 G2+ 从只验 1 个函数扩展到 5 种形状（21 个用例）",
+  "the_bug": {
+    "summary": "极坐标函数的 x 与 y 写反了：我写 x=sin/y=cos，实际是 x=cos/y=sin",
+    "how_i_concluded_wrong": [
+      "反汇编：fld [ebp+8] / fsincos / fmul [ebp+0xC] / fstp [eax] / fmul [ebp+0xC] / fstp [eax+4]",
+      "我的推理：fsincos 之后 st0=sin、st1=cos；第一次 fstp 弹出 st0（sin）写到 [eax]（x）",
+      "结论：x = sin*L, y = cos*L",
+      "**这个推理听起来完全合理，但是错的。**"
+    ],
+    "how_execution_disproved_it": {
+      "case": "angle=0.0, length=2.0",
+      "binary_result": {
+        "x": 2,
+        "y": 0
+      },
+      "math": "sin(0)=0, cos(0)=1",
+      "conclusion": "x=2.0 只能是 cos(0)*2，所以 x 用 cos；y=0.0 是 sin(0)*2，所以 y 用 sin"
+    },
+    "why_the_mistake_was_invisible_to_static_gates": [
+      "G1（类型一致性）：不检查运算语义",
+      "G2（二进制见证）：只检查 disp/imm/call 是否在函数内出现，0x8C 和 0xC 确实都在",
+      "G3（结构对齐）：循环数 0=0、分支数匹配、token 比合规",
+      "G4（规范形）：没有黑名单违规",
+      "G6（独立证据）：与这个函数无关",
+      "**五个静态门槛全过，但语义反了。**"
+    ],
+    "why_one_test_case_also_missed_it": "第一个用例选了 angle=pi/4，此时 sin=cos=0.707，两种解释都能通过 —— 这是弱测试。必须包含 sin != cos 的角度才能区分。"
+  },
+  "correction": {
+    "circle_version_0x00404B70": "x = cos(angle) * length, y = sin(angle) * length",
+    "scaled_version_0x00417750": "x = cos(angle) * length_x, y = sin(angle) * length_y",
+    "verified_by": "scaled: a=0.5 lx=2 ly=3 -> x=cos(0.5)*2=1.755165 ✓, y=sin(0.5)*3=1.438277 ✓"
+  },
+  "test_hardening": {
+    "added_angles": [
+      0.3,
+      2
+    ],
+    "reason": "原用例 0.0 / pi/4 / pi/2 / pi / -0.5 中，pi/4 是弱测试（sin=cos）；新增 0.3 和 2.0 确保 sin != cos",
+    "assertion_in_comments": "必须包含 sin != cos 的角度，否则无法区分 x=sin 与 x=cos"
+  },
+  "final_results": {
+    "functions_verified": 5,
+    "total_cases": 21,
+    "passed": 21,
+    "failed": 0,
+    "breakdown": {
+      "0x00402A50 timer tick": {
+        "cases": 7,
+        "status": "PASS"
+      },
+      "0x00404B70 polar (circle)": {
+        "cases": 7,
+        "status": "PASS"
+      },
+      "0x00417750 polar (scaled)": {
+        "cases": 3,
+        "status": "PASS"
+      },
+      "0x00405830 copy_vec3": {
+        "cases": 1,
+        "status": "PASS"
+      },
+      "0x00406720 set_first_field": {
+        "cases": 3,
+        "status": "PASS"
+      }
+    }
+  },
+  "methodology_lesson": [
+    "**x87 栈序推断容易出错。**",
+    "",
+    "fsincos 的 st0/st1 顺序、fstp 的弹出语义、fmul 作用在哪一层栈元素 ——",
+    "任一处记错都会让结论完全反转。而且这种错误**看不出错**：",
+    "写出来的注释逻辑自洽，静态门槛全过，甚至一个用例（pi/4）也能通过。",
+    "",
+    "**这类语义必须实测，不能靠读汇编推。**",
+    "",
+    "第二个教训：**测试用例要选能区分两种假设的输入**。",
+    "pi/4 处 sin=cos，是完全没有区分力的测试。",
+    "选 0 / pi/2 / 0.3 / 2.0 才能把 sin 和 cos 分开。"
+  ],
+  "tested_at": "2026-11-24T07:08:00.500Z"
+}

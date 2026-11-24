@@ -1,0 +1,5 @@
+{
+  "_comment": "AGENTS.md §3：类型只允许在 /include 定义并在此注册。",
+  "version": 0,
+  "types": {}
+}

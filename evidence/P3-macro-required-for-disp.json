@@ -1,0 +1,92 @@
+{
+  "_comment": "★★ 又一个 MSVC 代码生成发现：只有宏能让偏移折叠进 disp8 编码，inline/template 都不行。",
+  "date": "2026-11-24",
+  "before": {
+    "matched": 14,
+    "total": 19
+  },
+  "after": {
+    "matched": 16,
+    "total": 19
+  },
+  "problem": {
+    "symptom": "0x00405A60 / 0x0041C710 手工验证 MATCH，但进 check_bytes.py 后 DIFF",
+    "root_cause": "辅助函数 float_at(self, offset) 的 offset 参数没有被常量折叠进内存操作数",
+    "correct_bytes": "f30f104144c3 = movss xmm0,[ecx+0x44] ; ret"
+  },
+  "exhaustive_test": {
+    "target": "f30f104144c3",
+    "results": [
+      {
+        "form": "inline float* float_at(void* s, unsigned o)",
+        "bytes": "558bec8b450803450c5dc3",
+        "disasm": "push ebp / mov ebp,esp / mov eax,[ebp+8] / add eax,[ebp+0xC] / ...",
+        "verdict": "FAIL — offset 走栈参数"
+      },
+      {
+        "form": "__forceinline 同上",
+        "bytes": "558bec8b450803450c5dc3",
+        "verdict": "FAIL — __forceinline 也无效"
+      },
+      {
+        "form": "template<unsigned O> float* fa(void* s)",
+        "bytes": "558bec8b450883c0445dc3",
+        "disasm": "mov eax,[ebp+8] / add eax,0x44",
+        "verdict": "FAIL — 生成了 add 而非 disp"
+      },
+      {
+        "form": "template + __forceinline",
+        "bytes": "558bec8b450883c0445dc3",
+        "verdict": "FAIL"
+      },
+      {
+        "form": "#define FLOAT_AT(s,o) reinterpret_cast<float*>(static_cast<char*>(s)+(o))",
+        "bytes": "f30f104144c3",
+        "verdict": "MATCH"
+      },
+      {
+        "form": "宏 + constexpr 常量",
+        "bytes": "f30f104144c3",
+        "verdict": "MATCH"
+      }
+    ],
+    "conclusion": "**只有预处理宏（文本替换）能让常量折叠进 disp8 位移字段。** inline / __forceinline / template 全部失败。"
+  },
+  "why": {
+    "mechanism": "MSVC 的 x86 后端在生成 `movss xmm0,[ecx+0x44]` 时，需要 0x44 在**编译期就是字面量**。",
+    "inline_function": "inline 函数即使被内联展开，参数仍按「变量」处理，生成的地址计算是 add 而非 disp",
+    "template": "模板参数虽然是编译期常量，但 MSVC 在地址计算路径上仍生成 add eax,0x44 而不是直接编码 disp8",
+    "macro": "宏在预处理阶段做纯文本替换，`FLOAT_AT(self, 0x44)` 直接变成 `reinterpret_cast<float*>(static_cast<char*>(self) + 0x44)`，编译器看到的是字面量"
+  },
+  "new_matches": [
+    {
+      "va": "0x00404B60",
+      "bytes": 5,
+      "hex": "f30f1001c3",
+      "note": "上一轮已匹配"
+    },
+    {
+      "va": "0x00405A60",
+      "bytes": 6,
+      "hex": "f30f104144c3",
+      "note": "本轮宏修好"
+    },
+    {
+      "va": "0x0041C710",
+      "bytes": 11,
+      "hex": "f30f104174f30f594154c3",
+      "note": "本轮宏修好"
+    }
+  ],
+  "broader_lesson": [
+    "这条规则会影响所有使用字段偏移的函数。",
+    "",
+    "之前 Timer.cpp 用 inline field_at(self, kTimerCountdownOffset) 能匹配（0x00402A50），",
+    "是因为那条路径上偏移恰好以另一种形式被折叠了。**但这不可靠** —— 换个函数就可能失败。",
+    "",
+    "**结论：凡是要让偏移出现在 disp8 里的地方，都必须用宏。**",
+    "这应该写进工具链文档，作为「代码生成规则」的第四条。"
+  ],
+  "should_review": "Timer.cpp 和 FieldAccess.cpp 里其余用 inline 辅助的地方是否也应该改宏（当前能过，但可能脆弱）",
+  "tested_at": "2026-11-24T08:01:35.926Z"
+}

@@ -1,0 +1,100 @@
+{
+  "_comment": "用修正后的 function_extent 重做形状分析，得到的两组新发现",
+  "context": "上一轮修了 function_extent 的函数边界回溯 bug（call 目标不一定是函数起点）。本轮用它重跑形状分析。",
+  "finding_1_fsincos_split": {
+    "what_changed": "修复前 fsincos 形状被合并成一个 20 个函数的组；修复后正确拆成 17 + 2",
+    "why": "修复前把 0x00417750 / 0x00441580 错误归类为和 0x004587B0 同形状。实际它们的 `ret` 操作数不同：",
+    "group_a_17_functions": {
+      "ret": "8  (2 个参数)",
+      "addresses": [
+        "0x00404B70",
+        "0x00405A70",
+        "0x00406290",
+        "0x00407E10",
+        "0x00417B00",
+        "0x004299D0",
+        "0x004305B0",
+        "0x00430720",
+        "0x00441670",
+        "0x0044CDA0",
+        "0x004587B0",
+        "0x00463DF0",
+        "0x00467150",
+        "0x0047FFE0",
+        "0x00485B20",
+        "0x00486080",
+        "0x0048F370"
+      ],
+      "disassembly": [
+        "push ebp / mov ebp, esp / push ecx",
+        "mov [ebp-4], ecx            ; this",
+        "mov eax, [ebp-4]",
+        "fld  dword [ebp+8]          ; angle",
+        "fsincos                     ; st0=sin st1=cos",
+        "fmul dword [ebp+0xC]        ; * length",
+        "fstp dword [eax]            ; x = sin*length",
+        "fmul dword [ebp+0xC]        ; * length  <- 同一个参数",
+        "fstp dword [eax+4]          ; y = cos*length",
+        "ret 8"
+      ],
+      "meaning": "圆：x=sin(a)*L, y=cos(a)*L"
+    },
+    "group_b_2_functions": {
+      "ret": "0xC (3 个参数)",
+      "addresses": [
+        "0x00417750",
+        "0x00441580"
+      ],
+      "disassembly_difference": "第二次 fmul 用的是 [ebp+0x10] 而不是 [ebp+0xC]",
+      "meaning": "椭圆 / 各向异性：x=sin(a)*Lx, y=cos(a)*Ly",
+      "significance": "如果按合并后的形状写成一个函数，这 2 个永远匹配不上，而且会污染对另外 17 个的理解"
+    },
+    "note_on_x_sin_y_cos": "两组都是 x 用 sin、y 用 cos，不是常见的 (cos,sin)。这是从 fsincos 之后的 x87 栈序推出来的：fsincos 后 st0=sin、st1=cos，第一次 fstp 弹出 st0=sin 写入 [eax]"
+  },
+  "finding_2_security_cookie_encoding": {
+    "addresses": [
+      "0x0049DC88",
+      "0x0049E757",
+      "0x0049E776",
+      "0x0049EB13",
+      "0x0049EBF3"
+    ],
+    "count": 5,
+    "disassembly": [
+      "mov  edi, edi",
+      "push ebp / mov ebp, esp",
+      "mov  eax, dword [0x4C8A4C]   ; __security_cookie",
+      "and  eax, 0x1F",
+      "push 0x20 / pop ecx          ; ecx = 32",
+      "sub  ecx, eax                ; ecx = 32 - (cookie & 31)",
+      "mov  eax, [ebp+8]            ; value",
+      "ror  eax, cl",
+      "xor  eax, dword [0x4C8A4C]",
+      "pop ebp / ret"
+    ],
+    "meaning": "指针编码（pointer encoding），不是哈希。ror+xor 的组合应用两次会还原",
+    "ub_found_and_fixed": {
+      "issue": "`32 - (cookie & 31)` 可能等于 32。C++ 里 `value >> 32` 是未定义行为（移位量 >= 类型宽度）",
+      "x86_hardware_behavior": "`ror eax, cl` 对 32 位操作数把 CL 按 5 位掩码，cl=32 时实际旋转 0 次",
+      "fix": "先 `& 0x1F` 掩码到 0..31，shift==0 时直接返回 `value ^ cookie`",
+      "why_not_caught_by_gate": "G5（含 UBSan）因编译器缺口无法运行。这个 UB 是靠人工推导 x86 语义发现的，不是自动抓到的",
+      "honesty_note": "这说明 G5 缺位是实质性的：一类真实的 UB 只能靠人肉审"
+    }
+  },
+  "coverage_after": {
+    "matched_before": 50,
+    "matched_after": 54,
+    "total": 1678,
+    "ratio": 0.032181,
+    "delta_reason": "+2（椭圆 fsincos 拆分出来单列）+ 5（cookie 编码）- 3（原 fsincos 地址列表按新分组重算）= 净 +4"
+  },
+  "gates_after": {
+    "G1": "PASS",
+    "G2": "INCOMPLETE (54/1678)",
+    "G3": "PASS",
+    "G4": "PASS",
+    "G5": "INCOMPLETE (compiler gap)",
+    "G6": "INCOMPLETE"
+  },
+  "tested_at": "2026-11-24T06:01:09.360Z"
+}

@@ -1,0 +1,109 @@
+{
+  "_comment": "G2+ 行为验证扩展到全部 11 种形状、51 个用例。上一轮 21 个，本轮 +30。",
+  "date": "2026-11-24",
+  "coverage": {
+    "functions_matched_statically": 54,
+    "distinct_shapes": 11,
+    "shapes_verified_by_execution": 11,
+    "total_cases": 51,
+    "passed": 51,
+    "failed": 0
+  },
+  "shapes": [
+    {
+      "addr": "0x00402A50",
+      "name": "timer tick (countdown state machine)",
+      "count": 1,
+      "cases": 7
+    },
+    {
+      "addr": "0x00404B70",
+      "name": "polar -> Vec2 (circle)",
+      "count": 17,
+      "cases": 7
+    },
+    {
+      "addr": "0x00417750",
+      "name": "polar -> Vec2 (scaled, different Lx/Ly)",
+      "count": 2,
+      "cases": 3
+    },
+    {
+      "addr": "0x00404C20",
+      "name": "empty body (ret 0)",
+      "count": 13,
+      "cases": 1
+    },
+    {
+      "addr": "0x004903B9",
+      "name": "return 0 (xor eax,eax)",
+      "count": 4,
+      "cases": 1
+    },
+    {
+      "addr": "0x0049DC88",
+      "name": "encode_value (/GS pointer encoding)",
+      "count": 5,
+      "cases": 20
+    },
+    {
+      "addr": "0x00404B60",
+      "name": "read first field as float (movss)",
+      "count": 2,
+      "cases": 4
+    },
+    {
+      "addr": "0x0041FA20",
+      "name": "read first field as u32",
+      "count": 2,
+      "cases": 3
+    },
+    {
+      "addr": "0x00404AA0",
+      "name": "return this (mov eax,ecx)",
+      "count": 2,
+      "cases": 1
+    },
+    {
+      "addr": "0x00405830",
+      "name": "copy 12 bytes (Vec3)",
+      "count": 3,
+      "cases": 1
+    },
+    {
+      "addr": "0x00406720",
+      "name": "set first field",
+      "count": 3,
+      "cases": 3
+    }
+  ],
+  "key_finding_shift32_boundary": {
+    "what": "encode_value 的 ror 移位量 = 32 - (cookie & 31)，当 cookie & 31 == 0 时等于 32",
+    "why_it_matters": "C++ 里 `v >> 32` 是 UB（移位量 >= 类型宽度）；x86 的 ror 把 CL 掩码到 5 位，所以硬件行为是「旋转 0 次」",
+    "previous_state": "上一轮我靠人工推导 x86 语义写下了修正（先 &0x1F，shift==0 时直接 xor），但没有实测证据",
+    "now_verified": {
+      "real_cookie": "0xBB40E64E, cookie&31=14, shift_raw=18 — 碰不到边界",
+      "constructed_1": "cookie=0xBB40E640 -> cookie&31=0 -> shift_raw=32, 实测 eax=0xA974B038 与预期一致",
+      "constructed_2": "cookie=0x00000000 -> shift_raw=32 -> 完全不旋转, v=0x12345678 实测 eax=0x12345678"
+    },
+    "method": "在测试中直接覆盖 [0x004C8A4C] 处的 cookie 值，构造边界输入",
+    "test_cases_added": 20,
+    "conclusion": "上一轮的人工推导修正被实测证实正确"
+  },
+  "why_this_matters": {
+    "before_this_round": "54 个函数只通过静态门槛（G1/G2/G3/G4/G6），语义正确性未验证",
+    "after_this_round": "11 种形状全部有执行验证，51 个用例覆盖边界/负数/溢出/特殊值",
+    "concrete_value": "上一轮就靠这个抓到了 sin/cos 写反 —— 五个静态门槛全过但语义反了"
+  },
+  "honest_statement": "这证明 Phase A 的语义描述与原版机器码行为一致。**不等于字节相等** —— 那只在 P1（.text diff=0）才能验证，仍需编译器。",
+  "gates": {
+    "G1": "PASS",
+    "G2": "INCOMPLETE (54/1675)",
+    "G3": "PASS",
+    "G4": "PASS",
+    "G5": "INCOMPLETE (compiler gap)",
+    "G6": "INCOMPLETE",
+    "G2+": "PASS (51/51)"
+  },
+  "tested_at": "2026-11-24T07:11:39.710Z"
+}

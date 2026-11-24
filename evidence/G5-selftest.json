@@ -1,0 +1,64 @@
+{
+  "_comment": "G5 的自检。G5 当前无法 PASS，本文件记录原因与「做到了什么/没做什么」的分界。",
+  "gate": "G5",
+  "script": "tools/check_stability.py",
+  "status": "INCOMPLETE",
+  "why_not_pass": {
+    "summary": "G5 的两个原文要求都依赖「产出与原版一致的机器码」，本机工具链不匹配",
+    "original_requirements": [
+      "-O0/-O2/-Os 各编一份跑同组随机输入，行为必须一致",
+      "安全扰动（改注释/格式/重命名局部/字面量换 constexpr）后 .text 必须不变"
+    ],
+    "toolchain_gap": {
+      "original_needs": "MSVC build 27412 / 31328 / 31332（VS2019 16.0.x / 16.8 / 16.9，从 Rich Header 解出）",
+      "local_has": "MSVC 14.44.35207（VS2022 Community）",
+      "not_usable_because": "AGENTS.md §2 禁止为凑匹配改编译器。clang / VS2022 编出的 .text 与目标 MSVC 本来就不会逐字节相同，用它测「扰动后 .text 不变」测的是工具本身而非目标"
+    }
+  },
+  "findings_during_development": [
+    {
+      "issue": "find_msvc() 返回 0，误报「本机无 MSVC」",
+      "cause": "两处错：① os.walk 对 C:\\Program Files\\Microsoft Visual Studio 返回 0 文件（Windows 上该目录子树有 reparse point / 权限特殊性，walk 静默跳过）② glob 模式写成 <root>/<Edition>/VC/... 只跨一层，而 VS2022 实际布局是 <root>/<year>/<Edition>/VC/...（如 2022\\Community\\VC）",
+      "fix": "改用 glob（走底层 FindFirstFile，不受 walk 权限判断影响），并把模式扩展为同时尝试 <root>/*/*/VC/... 与 <root>/*/VC/...",
+      "measured": {
+        "before": "MSVC found: 无",
+        "after": "MSVC found: 14.44.35207"
+      },
+      "lesson": "「环境缺 X」的结论必须用多种方法交叉验证。os.path.isdir 说存在、os.walk 说没有，两者矛盾时不能采信任何一个"
+    },
+    {
+      "issue": "UB 探测误报 ub_suspect",
+      "cause": "clang 不支持 -Wmaybe-uninitialized，stderr 里出现 'unknown warning option'，而该字符串包含 'uninitialized'，被旧的 serious 过滤器命中",
+      "fix": "先从告警行里滤掉 'unknown warning option' / 'unknown argument'，再判断是否为 UB 征兆"
+    }
+  ],
+  "what_was_substituted_honestly": {
+    "claim": "多优化级告警集合一致性",
+    "measurement": "clang -O0 / -O2 / -Os 各做一次 -fsyntax-only，比较告警集合",
+    "result_for_timer_cpp": {
+      "-O0": 0,
+      "-O2": 0,
+      "-Os": 0
+    },
+    "why_weaker": "检查的是源码对优化级的敏感性，不是运行时行为一致性",
+    "explicit_statement": "不能替代 G5 原文要求，只作为 UB 早期预警。输出里每次都会打印 NOT_EXECUTED 说明"
+  },
+  "ub_static_probe": {
+    "flags_used": [
+      "-Wuninitialized",
+      "-Wmaybe-uninitialized",
+      "-Wnull-dereference",
+      "-Warray-bounds",
+      "-Wstrict-aliasing",
+      "-Wformat=2"
+    ],
+    "result": {
+      "src/Timer.cpp": {
+        "warnings": 0
+      }
+    },
+    "note": "这是源码健康检查，不依赖匹配原版工具链，所以能做且有意义"
+  },
+  "dashboard_policy": "G5 在 status != PASS 时 gates_implemented.G5 记 false，且 _notes.G5 写清是编译器缺口导致",
+  "tested_at": "2026-11-24T05:11:16.033Z"
+}

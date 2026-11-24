@@ -1,0 +1,76 @@
+{
+  "_comment": "VS2019 安装尝试的完整记录。结论：卡在 UAC 提权，需要用户手动执行一次。所有组件包已下载完成，只差安装。",
+  "date": "2026-11-24",
+  "goal": "安装 MSVC v142（VS2019 16.11）以验证 P1（.text diff=0）",
+  "final_status": "BLOCKED_ON_UAC — 需要在管理员权限下手动执行一次",
+  "attempts": [
+    {
+      "n": 1,
+      "method": "vs_buildtools_2019.exe --quiet --wait --installPath D:\\...\\2019\\BuildTools --add VCTools --add VC.v142.x86.x64 --add Windows10SDK.19041",
+      "duration": "约 20 分钟",
+      "observed": "进程存活、有网络连接（443）、CPU 少量活动，但安装目录从未创建",
+      "misdiagnosis": "我先看 C:\\ProgramData\\Microsoft\\VisualStudio\\Packages\\_Instances 只涨到 52 MB，判断「卡在下载」。**这个判断是错的** —— 实际下载在 Packages\\<pkgname> 里，不在 _Instances",
+      "actual_result": "94 个包（含 Win10SDK 431 MB + v142 全套约 700 MB）已成功下载到缓存"
+    },
+    {
+      "n": 2,
+      "method": "vs_buildtools_2019.exe --layout D:\\VS2019Layout --lang en-US --add ... --quiet",
+      "duration": "约 3 分钟",
+      "observed": "D:\\VS2019Layout 一直是 0 MB / 2 文件",
+      "conclusion": "--layout 参数被忽略（该 boostrapper 版本可能不支持），安装器仍用默认缓存路径"
+    },
+    {
+      "n": 3,
+      "method": "vs_buildtools_2019.exe --passive --norestart --installPath D:\\VS2019BT --add VC.v142",
+      "duration": "约 3 分钟",
+      "observed": "D:\\VS2019BT 创建了 Common7/Licenses/MSBuild 共 77 MB，但无 VC 目录；vsi.err 里全是 libpng warning（说明在渲染 UI）",
+      "conclusion": "--passive 会弹 UI 等用户确认，无人点击则停住"
+    }
+  ],
+  "root_cause": {
+    "finding": "当前进程非管理员",
+    "evidence": "WindowsIdentity: GTの笔记本\\绿色的糖果, IsInRole(Administrator) = False",
+    "consequence": "--quiet 需要 UAC 提权但静默模式无法弹窗；--passive 会弹 UI 但无人交互。两条路都走不通。",
+    "not_a_network_problem": "网络实测正常（vs16 channel 131 KB / 1.1 s），且 94 个包已完整下载"
+  },
+  "what_is_ready": {
+    "packages_cached": 94,
+    "key_packages": [
+      "Microsoft.VC.14.29.16.11.Tools.HostX86.TargetX86.base (16 MB)",
+      "Microsoft.VC.14.29.16.11.Tools.HostX64.TargetX86.base (17 MB)",
+      "Microsoft.VC.14.29.16.11.CRT.Headers.base (3 MB)",
+      "Win10SDK_10.0.19041,version=10.0.19041.4 (431 MB)"
+    ],
+    "cache_location": "C:\\ProgramData\\Microsoft\\VisualStudio\\Packages",
+    "note": "14.29 = MSVC v142 = VS2019 16.11 工具集"
+  },
+  "user_action_needed": {
+    "script": "D:\\Windows\\GreenSweet\\Game\\Software\\vs_installers\\install-vs2019.bat",
+    "what_it_does": "请求管理员权限后，用 --quiet 从已有缓存安装 MSVC v142 + Win10 SDK 到 D:\\VS2019BT",
+    "expected_duration": "5-15 分钟（包已下载，无需再联网）",
+    "how_to_run": "右键 → 以管理员身份运行，或在弹出的 UAC 对话框点「是」"
+  },
+  "cleanup_done": [
+    "D:\\VS2019BT（半安装的 77 MB 壳）已删除",
+    "D:\\VS2019Layout（0 MB 空目录）已删除",
+    "所有安装器进程已停止"
+  ],
+  "methodology_lesson": [
+    "「进度没变」不等于「卡住了」。",
+    "",
+    "第 1 次尝试中，我盯着 _Instances 目录的 52 MB 认为下载停滞，",
+    "实际下载在 Packages\\<pkgname> 里正常进行，20 分钟内下完了 94 个包约 1.2 GB。",
+    "我在错误的地方找进度，于是错误地中断了一次本来可能成功的安装。",
+    "",
+    "正确做法：先枚举整个缓存根目录下今天新增的文件，而不是盯着某一个子目录。",
+    "本轮的 evidence 里保留了这次误判，因为它直接导致了一次不必要的中断。"
+  ],
+  "next_steps_after_install": [
+    "验证 cl.exe 存在与版本（应为 19.29.30159.x）",
+    "确认 31328 / 31332 是否同源 —— 若同源则无需再装 VS2017",
+    "若原版还需要 VS2017 15.x（prodId 27412，237 个单元），另行请求授权",
+    "跑 G5（多优化级行为一致性）",
+    "尝试编译 0x00402A50 并与原版 .text 比对 —— P1 首次可执行"
+  ],
+  "tested_at": "2026-11-24T06:46:21.184Z"
+}

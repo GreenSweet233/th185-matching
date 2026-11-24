@@ -1,0 +1,122 @@
+{
+  "_comment": "P1 第二批 6 个函数全部字节匹配（6/6），累计 13/17。同时暴露 fsincos 无法用 MSVC 生成的问题。",
+  "date": "2026-11-24",
+  "result": {
+    "matched": 13,
+    "total": 17
+  },
+  "new_matches": [
+    {
+      "va": "0x00404D10",
+      "bytes": 10,
+      "hex": "558bec8b45085dc20c00",
+      "form": "int __stdcall f(int a,int b,int c) { return a; }",
+      "note": "stdcall，ret 0xC 自动清理 3 个参数"
+    },
+    {
+      "va": "0x00407E40",
+      "bytes": 12,
+      "hex": "33c03981a00200000f95c0c3",
+      "form": "int __fastcall f(void* s, void* d) { return *(int*)((char*)s+0x2A0) != 0; }",
+      "note": "★ 返回类型必须是 int 不能是 bool"
+    },
+    {
+      "va": "0x0040A050",
+      "bytes": 9,
+      "hex": "c701000000008bc1c3",
+      "form": "void* __fastcall f(void* s, void* d) { *(int*)s = 0; return s; }"
+    },
+    {
+      "va": "0x00409F60",
+      "bytes": 13,
+      "hex": "558bec8b45088941205dc20400",
+      "form": "void __fastcall f(void* s, void* d, int v) { *(int*)((char*)s+0x20) = v; }"
+    },
+    {
+      "va": "0x00433BC0",
+      "bytes": 12,
+      "hex": "558bec8b450889015dc20400",
+      "form": "void __fastcall f(void* s, void* d, int v) { *(int*)s = v; }",
+      "note": "与 0x00406720 完全同形状"
+    },
+    {
+      "va": "0x004063C0",
+      "bytes": 31,
+      "hex": "558bec8b4508f30f7e00660fd681f00500008b40088981f80500005dc20400",
+      "form": "struct V3{int x,y,z;}; *(V3*)((char*)s+0x5F0) = *(const V3*)src;"
+    }
+  ],
+  "key_finding_int_vs_bool": {
+    "function": "0x00407E40",
+    "original": "33c03981a00200000f95c0c3",
+    "disasm": "xor eax,eax / cmp dword [ecx+0x2A0], eax / setne al / ret",
+    "attempts": [
+      {
+        "return_type": "bool",
+        "bytes": "83b9a0020000000f95c0c3",
+        "note": "cmp [mem],0 直接形式（83b9，4 字节立即数）"
+      },
+      {
+        "return_type": "int",
+        "bytes": "33c03981a00200000f95c0c3",
+        "note": "MATCH — xor eax,eax 后 cmp [mem],eax（3981）"
+      },
+      {
+        "return_type": "char",
+        "bytes": "83b9a0020000000f95c0c3"
+      },
+      {
+        "return_type": "三元 1:0",
+        "bytes": "33c03981a00200000f95c0c3",
+        "note": "MATCH"
+      }
+    ],
+    "lesson": "返回 bool 与返回 int 走不同的比较路径。bool 用 cmp [mem],0（立即数 0），int 用 xor eax,eax + cmp [mem],eax（寄存器）。两者都合法但字节不同。判断原版是哪个，要看有没有 33c0（xor eax,eax）前缀。"
+  },
+  "aggregate_assignment_reconfirmed": {
+    "function": "0x004063C0",
+    "note": "与 0x00405830 同样的 movq+mov 路径，再次验证 struct 整体赋值的结论",
+    "bytes": "558bec8b4508 f30f7e00 660fd681f0050000 8b4008 8981f8050000 5dc20400"
+  },
+  "new_problem_fsincos": {
+    "functions": [
+      "0x00404B70",
+      "0x00417750"
+    ],
+    "original_size": 32,
+    "our_size": 81,
+    "symptom": "改成 ::sin/::cos 后从 MATCH 变成 DIFF（之前用 std::sin 时是匹配的？需核实）",
+    "investigation": {
+      "msvc_behavior": "MSVC 不会为 sinf(a)+cosf(a) 自动生成 x87 的 fsincos 复合指令",
+      "tested_forms": [
+        {
+          "form": "sinf(a)*L, cosf(a)*L",
+          "result": "编译失败（缺 stdio.h 链式依赖）"
+        },
+        {
+          "form": "(float)sin(a)*L, (float)cos(a)*L",
+          "result": "编译失败"
+        },
+        {
+          "form": "extern \"C\" sinf/cosf 分开调用",
+          "result": "83 字节（函数调用，非内联）"
+        }
+      ],
+      "conclusion": "fsincos 是 x87 复合指令，MSVC 编译器前端不会主动合成它。原版这个函数要么用了内联汇编，要么 MSVC 某个版本/开关会生成它"
+    },
+    "impact": "2 个 fsincos 函数（共 19 个地址，17+2）无法字节匹配",
+    "status": "UNRESOLVED"
+  },
+  "cumulative_toolchain_knowledge": {
+    "compiler": "MSVC v142 19.29.30159 (x86)，从 vsix 解压",
+    "flags": "/MT /O2 /GS- /Oy-",
+    "call_convention": "__fastcall + 哑 edx 模拟 thiscall；stdcall 直接可用",
+    "codegen_rules_discovered": [
+      "/Oy- 保留栈帧（原版大部分函数有栈帧）",
+      "12 字节聚合类型用 struct 整体赋值（触发 SSE2 movq）",
+      "返回 int 用 xor+cmp，返回 bool 用 cmp imm",
+      "stdcall 的 ret N 自动生成"
+    ]
+  },
+  "tested_at": "2026-11-24T07:41:44.287Z"
+}

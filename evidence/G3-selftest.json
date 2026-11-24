@@ -1,0 +1,62 @@
+{
+  "_comment": "AGENTS.md §12：门槛脚本必须能用变异测试证明自己会失败。本文件记录 G3 的自检结果。",
+  "gate": "G3",
+  "script": "tools/check_structure.py",
+  "depends_on": [
+    "tools/pe_common.py",
+    "tools/check_witness.py（复用 witness 解析与 function_extent）"
+  ],
+  "judgement_policy": {
+    "loops": "源码循环数必须 == 二进制 CFG 回边数。二进制有回边而源码 0 循环 -> source_fully_unrolled（FAIL）",
+    "branches": "源码分支数 <= 二进制条件跳转数 + 容差（容差 = max(2, cond_jumps)）",
+    "token_ratio": "函数体内 token 数 / 指令数 <= tools/config.json 的 g3.token_per_instruction_max（默认 4.0）"
+  },
+  "findings_during_development": [
+    {
+      "issue": "token_ratio 5.38 > 4.0 误报 FAIL",
+      "cause": "第一版 token 统计范围是**整个文件**，而指令数只统计目标函数。Timer.cpp 全文件 43 token 里包含 include、namespace 开闭、field_at 辅助函数、@witness 注释；目标函数本体只有 17 token",
+      "fix": "新增 function_body_lines()：从 //@witness 行往下找函数体起始，做花括号配平得到行区间；AST 的 loops/branches 按 loc.line 过滤到该区间，token 也只数该区间",
+      "measured": {
+        "before": {
+          "tokens": 43,
+          "ratio": 5.38,
+          "verdict": "FAIL"
+        },
+        "after": {
+          "tokens": 17,
+          "ratio": 2.12,
+          "verdict": "PASS"
+        }
+      },
+      "lesson": "两边的统计口径必须对等。指令数精确到函数，token 就必须精确到函数；否则比例毫无意义"
+    },
+    {
+      "issue": "替换函数签名时把调用点拆行，漏了右括号 -> SyntaxError",
+      "cause": "字符串替换时只替换了一半（签名 + 三行调用），右括号在另一处",
+      "fix": "补全调用参数与右括号"
+    }
+  ],
+  "mutation_tests": [
+    {
+      "id": "M1-real-function-pass",
+      "mutation": "0x00402A50 + 对应的 Phase A 实现（无循环、1 个 if）",
+      "expected": "loops 0==0, branch 1<=1+tol, ratio <= 4.0",
+      "actual": "binary 8 instr / 0 back-edge / 1 cond jump；source 0 loop / 1 branch / 17 token；ratio 2.12 -> PASS",
+      "result": "PASS"
+    },
+    {
+      "id": "M2-fully-unrolled",
+      "mutation": "声称匹配 0x00405930（二进制 12 指令 / 1 条回边 / 3 个条件跳转），但源码只有一行 return，0 循环",
+      "expected": "FAIL source_fully_unrolled",
+      "actual": "loops: src=0 bin=1 MISMATCH; [FAIL] source_fully_unrolled 0x00405930",
+      "result": "PASS",
+      "significance": "§6 G3 原文『二进制有循环而源码全展开 -> FAIL』被证实可执行"
+    }
+  ],
+  "limitations_honestly_stated": [
+    "不可归约控制流的完整支配树分析未实现；本版只统计回边数（count），不判断每条回边是否合法",
+    "分支容差取 max(2, cond_jumps) 是经验值，不是从二进制推出",
+    "源码结构统计依赖 //@witness func= 定位函数体，若注释位置写错会统计到错误区间"
+  ],
+  "tested_at": "2026-11-24T05:04:45.249Z"
+}

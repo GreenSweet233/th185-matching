@@ -1,0 +1,100 @@
+{
+  "_comment": "G2+ 行为等价验证器：用 unicorn 执行原版机器码，与源码语义对比。这是本项目第一个能验证「语义正确」而不只是「形式正确」的门槛。",
+  "gate": "G2+",
+  "script": "tools/check_behavior.py",
+  "why_it_exists": {
+    "static_gates_limitation": "G1/G2/G3/G4/G6 都是静态检查：看反汇编、看 AST、看结构统计。它们能发现「形式不对」，但发现不了「语义算错了」。",
+    "concrete_example": "0x00402A50 的语义如果我把 `jns`（>=0 跳转）误读成 `js`（<0 跳转），或把数组下标写成 countdown 而非 countdown-1，静态门槛全都不会报，但行为完全不同。",
+    "what_this_does": "直接执行原版机器码，用一组输入跑出真实结果，与 Python 独立重算的语义对比。"
+  },
+  "relation_to_G5": {
+    "G5_requires": "-O0/-O2/-Os 各编一份跑同组随机输入，行为一致",
+    "this_covers": "「源码语义 == 原版行为」这一半",
+    "still_missing": "「不同优化级之间一致」仍需编译器（未装成）"
+  },
+  "target": {
+    "function": "0x00402A50",
+    "range": "0x00402A50..0x00402A93 (68 字节)",
+    "disassembly": [
+      "0x00402A50  mov edx, [ecx+0x8C]",
+      "0x00402A56  sub edx, 1",
+      "0x00402A59  mov [ecx+0x8C], edx",
+      "0x00402A5F  jns 0x00402A7C        ; countdown >= 0 则跳到 L2",
+      "0x00402A61  mov dword [ecx+0x8C], 0",
+      "0x00402A6B  mov dword [ecx+0x00], 0",
+      "0x00402A71  mov dword [ecx+0xD4], 0",
+      "0x00402A7B  ret                    ; 负分支返回",
+      "0x00402A7C  L2:",
+      "0x00402A7C  mov eax, [ecx+edx*4+0x0C]",
+      "0x00402A80  mov [ecx], eax",
+      "0x00402A82  mov eax, [ecx+edx*4+0x4C]",
+      "0x00402A86  mov [ecx+8], eax",
+      "0x00402A89  mov dword [ecx+0xD4], 0",
+      "0x00402A93  ret"
+    ],
+    "semantics": "递减 [ecx+0x8C]；为负则清三个字段后返回；非负则以递减后的值为下标，从 +0x0C 与 +0x4C 两个数组取值写入 +0x00 与 +0x08，再清 +0xD4"
+  },
+  "results": {
+    "total": 7,
+    "passed": 7,
+    "cases": [
+      {
+        "init_countdown": 5,
+        "case": "非负分支：5-1=4 -> A[4]/B[4]",
+        "status": "PASS"
+      },
+      {
+        "init_countdown": 1,
+        "case": "边界：1-1=0（仍非负）",
+        "status": "PASS"
+      },
+      {
+        "init_countdown": 0,
+        "case": "边界：0-1=-1（负）-> 清零",
+        "status": "PASS"
+      },
+      {
+        "init_countdown": -1,
+        "case": "负数输入",
+        "status": "PASS"
+      },
+      {
+        "init_countdown": 15,
+        "case": "15-1=14（数组最后一项）",
+        "status": "PASS"
+      },
+      {
+        "init_countdown": 16,
+        "case": "16-1=15（数组尾）",
+        "status": "PASS"
+      },
+      {
+        "init_countdown": 30,
+        "case": "30-1=29（超界，读相邻字段）",
+        "status": "PASS"
+      }
+    ]
+  },
+  "bugs_found_while_building_this": [
+    {
+      "n": 1,
+      "symptom": "全部 UC_ERR_FETCH_UNMAPPED",
+      "cause": "emu_start(func_va, until=SENTINEL) 的 until 只是「跑到该地址时停」，但它仍会先尝试取指再判断",
+      "fix": "用 UC_HOOK_CODE 在哨兵地址主动 emu_stop()"
+    },
+    {
+      "n": 2,
+      "symptom": "EIP = 0x00000000",
+      "cause": "栈布局错：先写哨兵到 esp，然后 esp += 4 再压参数，最后 reg_write(ESP, esp) 指向了参数而非哨兵。ret 弹出参数值（0）跳到了地址 0",
+      "fix": "先算总大小，一次性写好栈内容，再设 ESP 指向哨兵"
+    },
+    {
+      "n": 3,
+      "symptom": "did not reach sentinel (EIP=0x003FFFF0)",
+      "cause": "until 参数已经让 emu_start 停下来，hook 没机会执行",
+      "fix": "until 传 0（不指定），完全靠 hook；同时放宽判定「EIP 已在哨兵也算成功」"
+    }
+  ],
+  "honest_statement": "这证明 Phase A 的语义描述与原版机器码行为一致。**不等于字节相等** —— 那只在 P1（.text diff=0）才能验证，仍需编译器。",
+  "tested_at": "2026-11-24T07:02:50.627Z"
+}

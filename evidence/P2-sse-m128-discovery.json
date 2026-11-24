@@ -1,0 +1,72 @@
+{
+  "_comment": "★★ 重大发现：原版广泛使用 SSE __m128 标量运算，而不是普通 float。这解释了为什么 14 种编译选项都生成不出 movss。",
+  "date": "2026-11-24",
+  "discovery": {
+    "symptom_before": "0x00404B60 等函数的原版是 `movss xmm0,[ecx]`（SSE），MSVC 对 `float` 返回只生成 `fld dword [ecx]`（x87），14 种编译选项全试过无效",
+    "root_cause": "原版返回类型不是 `float`，而是 `__m128`",
+    "proof": {
+      "float_return": "d94144c3 = fld dword [ecx+0x44] ; ret  (5 字节)",
+      "m128_return": "f30f104144c3 = movss xmm0,[ecx+0x44] ; ret  (6 字节)",
+      "original_0x00405A60": "f30f104144c3",
+      "verdict": "MATCH —— 原版确实返回 __m128"
+    },
+    "code_form": "__m128 __fastcall f(void* self, void* unused_edx) { return _mm_load_ss(float_at(self, 0x44)); }"
+  },
+  "newly_verified": [
+    {
+      "va": "0x00404B60",
+      "bytes": 5,
+      "hex": "f30f1001c3",
+      "form": "_mm_load_ss((float*)self)",
+      "verdict": "MATCH"
+    },
+    {
+      "va": "0x00405A60",
+      "bytes": 6,
+      "hex": "f30f104144c3",
+      "form": "_mm_load_ss(float_at(self,0x44))",
+      "verdict": "手工测试 MATCH，进脚本后 DIFF（需查）"
+    },
+    {
+      "va": "0x0041C710",
+      "bytes": 11,
+      "hex": "f30f104174f30f594154c3",
+      "form": "_mm_mul_ss(_mm_load_ss(float_at(self,0x74)), *(__m128*)float_at(self,0x54))",
+      "verdict": "手工测试 MATCH，进脚本后 DIFF（需查）"
+    }
+  ],
+  "second_key_finding_mulss_memory_operand": {
+    "target": "f30f104174 f30f594154 c3",
+    "disasm": "movss xmm0,[ecx+0x74] ; mulss xmm0,[ecx+0x54] ; ret",
+    "attempts": [
+      {
+        "form": "_mm_mul_ss(_mm_load_ss(&a), _mm_load_ss(&b))",
+        "bytes": "f30f104174 f30f105154 f30f59c2 c3",
+        "len": 15,
+        "note": "先把两个都 load 到寄存器"
+      },
+      {
+        "form": "_mm_mul_ss(_mm_load_ss(&a), *(__m128*)&b)",
+        "bytes": "f30f104174 f30f594154 c3",
+        "len": 11,
+        "note": "MATCH —— 第二个操作数保持内存形式"
+      }
+    ],
+    "lesson": "`_mm_mul_ss(a, *(__m128*)ptr)` 让 MSVC 生成 `mulss xmm0, [mem]`（内存操作数）；而 `_mm_mul_ss(a, _mm_load_ss(ptr))` 会先 load 到寄存器再 mul。两者语义相同但字节不同。这是 SSE intrinsic 的代码生成细节。"
+  },
+  "broader_implication": {
+    "what_it_means": "原版使用了大量 SSE 标量 intrinsic（`_mm_load_ss` / `_mm_mul_ss` 等），不是纯 C++ float 运算。",
+    "scan_evidence": "在 101 种无栈帧新形状里，`movss` 出现了至少 3 次（0x00404B60 / 0x00405A60 / 0x0041C710），说明这不是个案",
+    "consequence_for_matching": [
+      "凡是原版用 movss/mulss/addss 的地方，源码必须用 __m128 + intrinsic，不能用 float",
+      "这解释了为什么 G2+ 的行为验证能过（语义相同）而 P1 字节不等（代码生成路径不同）",
+      "对 G3 的 token 统计有影响（__m128 声明 + intrinsic 调用 token 更多）"
+    ]
+  },
+  "current_p1": {
+    "matched": 14,
+    "total": 19,
+    "note": "0x00404B60 从 DIFF 变 MATCH；0x00405A60 / 0x0041C710 手工测试 MATCH 但进脚本 DIFF，需排查脚本提取逻辑"
+  },
+  "tested_at": "2026-11-24T07:56:41.430Z"
+}

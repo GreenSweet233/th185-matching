@@ -1,0 +1,129 @@
+{
+  "_comment": "★ P1 从 4/11 提升到 7/11。两个关键发现：/Oy- 和 struct 整体赋值。",
+  "date": "2026-11-24",
+  "before": {
+    "matched": 4,
+    "total": 11,
+    "flags": "/MT /O2 /GS-"
+  },
+  "after": {
+    "matched": 7,
+    "total": 11,
+    "flags": "/MT /O2 /GS- /Oy-"
+  },
+  "breakthrough_1_frame_pointer": {
+    "flag": "/Oy-",
+    "what_it_does": "禁用帧指针省略（Disable Frame Pointer Omission），强制保留 push ebp / mov ebp,esp / ... / pop ebp",
+    "why_needed": "原版函数有完整栈帧，而 /O2 默认开 /Oy（省略帧指针），生成无栈帧的紧凑代码",
+    "evidence": {
+      "function": "0x00406720 set_first_field",
+      "original": "558bec8b450889015dc20400",
+      "with_O2_default": "8b4424048901c20400",
+      "with_O2_Oy_minus": "558bec8b450889015dc20400",
+      "verdict": "MATCH"
+    },
+    "tested_matrix": [
+      {
+        "flags": "/Od /GS-",
+        "result": "558bec83ec088955f8894dfc8b45fc8b4d0889088be55dc20400",
+        "note": "有栈帧但多了局部变量"
+      },
+      {
+        "flags": "/O1 /GS-",
+        "result": "8b4424048901c20400",
+        "note": "无栈帧"
+      },
+      {
+        "flags": "/O2 /GS-",
+        "result": "8b4424048901c20400",
+        "note": "无栈帧"
+      },
+      {
+        "flags": "/O2 /GS- /Oy-",
+        "result": "558bec8b450889015dc20400",
+        "note": "MATCH"
+      },
+      {
+        "flags": "/O2 /GS- /Ob0",
+        "result": "8b4424048901c20400",
+        "note": "无栈帧（/Ob0 不影响）"
+      }
+    ],
+    "lesson": "原版有栈帧不等于没优化。/Oy- 单独控制帧指针，与优化级正交。"
+  },
+  "breakthrough_2_aggregate_copy": {
+    "function": "0x00405830 copy_vec3",
+    "original": "558bec8b4508f30f7e00660fd6018b40088941085dc20400",
+    "what_it_uses": "movq xmm0, [eax] (8字节 SSE2 移动) + mov [ecx+8], eax (4字节)",
+    "attempts": [
+      {
+        "source": "3 次 u32 赋值 o[0]=s[0]; o[1]=s[1]; o[2]=s[2];",
+        "result": "558bec8b55088b0289018b42048941048b42088941085dc20400",
+        "verdict": "3 条 mov，18 字节"
+      },
+      {
+        "source": "struct Vec3Raw { int x,y,z; }; *(Vec3Raw*)self = *(const Vec3Raw*)src;",
+        "result": "558bec8b4508f30f7e00660fd6018b40088941085dc20400",
+        "verdict": "MATCH"
+      }
+    ],
+    "lesson": "MSVC 对 12 字节聚合类型的整体赋值走 SSE2 movq+mov 路径；逐字段赋值走普通 mov。这是两条不同的代码生成路径，必须用准确的源形式触发。"
+  },
+  "remaining_failures": [
+    {
+      "func": "0x00404B60 read_first_float",
+      "orig": "f30f1001c3",
+      "ours": "d901c3",
+      "analysis": "原版 movss xmm0,[ecx]（SSE），MSVC 用 fld dword [ecx]（x87）返回 float",
+      "tested": [
+        "/O2",
+        "/O2 /arch:SSE2",
+        "/O2 /arch:SSE",
+        "/O2 /fp:fast",
+        "/O2 /arch:SSE2 /fp:fast",
+        "/O1",
+        "/O2 /Oy",
+        "/O2 /Oy-"
+      ],
+      "all_produced": "d901c3 (fld)",
+      "hypothesis": "这个函数可能不是「返回 float」，而是返回 __m128 或 inline 展开片段。需进一步调查。",
+      "status": "UNRESOLVED"
+    },
+    {
+      "func": "0x0049DC88 encode_value",
+      "orig": "8bff558beca14c8a4c0083e01f6a20592bc88b4508d3c833054c8a4c005dc3",
+      "ours": "(34 字节，/O2 /Oy-)",
+      "analysis": "原版有 mov edi,edi（hotpatch 序言）+ push ebp 栈帧 + push 0x20/pop ecx（常量装入）",
+      "key_observation": "push 0x20 / pop ecx 比 mov ecx,0x20 长 2 字节，说明原版未做这种强度削减",
+      "candidates_tested": [
+        {
+          "src": "&0x1F + if(s==0) 分支",
+          "O2": "a14c8a4c008bc8f7d983e11f7402d3ca33c2c3"
+        },
+        {
+          "src": "不掩码 rotate",
+          "O2": "a14c8a4c00b92000000083e01f2bc8d3ca33154c8a4c008bc2c3"
+        },
+        {
+          "src": "不掩码 rotate",
+          "O1": "568b354c8a4c008bc66a2083e01f592bc8d3ca33d68bc25ec3"
+        }
+      ],
+      "closest": "/O1 版本有 6a20(push 0x20) 和 59(pop ecx)，与原版结构最接近",
+      "status": "UNRESOLVED — 可能需要 VS2017 或不同优化组合"
+    }
+  ],
+  "toolchain_facts": {
+    "compiler": "MSVC v142 19.29.30159 (x86)，从 .vsix 解压，无需管理员权限",
+    "flags_confirmed": "/MT /O2 /GS- /Oy-",
+    "call_convention": "__fastcall + 哑 edx 模拟 thiscall",
+    "compiler_cache_check": "ProgramData\\Microsoft\\VisualStudio\\Packages 里只有 14.29（50 包）和 14.44（61 包），**没有 VS2017 的 14.16**"
+  },
+  "rich_header_reinterpretation": {
+    "old_belief": "prodId 27412 = VS2017 15.x，237 个编译单元",
+    "new_finding": "prodId 27412 = 0x6B14，31328 = 0x7A60，31332 = 0x7A64 —— 这些高字节 0x6B/0x7A 不符合已知 MSVC 编译器编码（0xD1-0xDC 系列）",
+    "conclusion": "这些可能不是「编译器版本」，而是**工具类别**（如链接器/资源编译器/CVT 工具）的 prodId。具体含义待查。",
+    "implication": "之前「需要 VS2017 + VS2019 两代」的推断可能也不准确。当前 v142 已能匹配 7/11，说明大部分代码确实是 VS2019 产出。"
+  },
+  "tested_at": "2026-11-24T07:26:27.139Z"
+}

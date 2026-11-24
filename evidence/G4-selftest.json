@@ -1,0 +1,69 @@
+{
+  "_comment": "AGENTS.md §12：门槛脚本必须能用变异测试证明自己会失败。本文件记录 G4 的自检结果。",
+  "gate": "G4",
+  "script": "tools/check_style.py",
+  "blacklist_rules_implemented": [
+    "goto",
+    "inline_asm",
+    "pragma_optimize",
+    "msvc_attribute",
+    "pad_array",
+    "pad_member",
+    "bad_name_short",
+    "bad_name_sub_hex",
+    "bare_offset_cast"
+  ],
+  "canonical_form_rules_implemented": [
+    "while_should_be_for",
+    "deep_nesting"
+  ],
+  "findings_during_development": [
+    {
+      "issue": "bare_offset_cast 从不命中",
+      "cause": "正则用 <[^>]+> 匹配模板参数，但 static_cast<char*>(self) 里的 '>' 被提前消耗，整条正则永远不匹配",
+      "fix": "改用 <[^;]*?> 非贪婪 + [^;]*? 跳过中间类型转换",
+      "lesson": "正则里用 [^>]+ 匹配 C++ 模板参数是错的——模板参数内部可以有 >（如 char*），会让匹配提前结束"
+    },
+    {
+      "issue": "SyntaxWarning: invalid escape sequence",
+      "cause": "docstring 与 why 字符串里的 v\\d+ 等裸反斜杠",
+      "fix": "docstring 改 raw string，why 里的反斜杠加倍"
+    }
+  ],
+  "mutation_tests": [
+    {
+      "id": "M1-all-blacklist-rules",
+      "mutation": "一个文件里逐行写出全部 9 种黑名单违规",
+      "expected": "9 条规则各命中 1 次",
+      "actual": "violations=8 in first run（bare_offset_cast 未命中，因测试用了 C 风格 cast），修复正则后 9/9",
+      "result": "PASS after fix"
+    },
+    {
+      "id": "M2-no-false-positive-on-clean-code",
+      "mutation": "干净代码：合法 for、while(true)、字段访问；注释里含 goto/__asm/v1/pad 字样",
+      "expected": "PASS，0 violations",
+      "actual": "violations=0, parse errors=0, [PASS] G4",
+      "result": "PASS",
+      "significance": "证明注释剥离有效——注释里的敏感词不触发误报"
+    },
+    {
+      "id": "M3-while-should-be-for",
+      "mutation": "while (i < count) { ++i; } —— 循环体在自增计数器",
+      "expected": "FAIL while_should_be_for",
+      "actual": "FAIL  while_should_be_for  src/_g4test.cpp:5",
+      "result": "PASS"
+    }
+  ],
+  "clang_format_unavailable": {
+    "status": "FORMAT_UNAVAILABLE",
+    "reason": "本机无独立 clang-format 可执行文件（已全盘搜索 thvip/ 与 PATH；只在 emsdk 的 SDL 源码里找到 clang-format-src.sh 脚本，那是构建脚本不是工具）",
+    "consequence": "G4 的『过 clang-format』这一半未执行。脚本每次运行都会打印 FORMAT_UNAVAILABLE，不假装通过。",
+    "resolution_needed": "安装 clang-format（随 LLVM 发行版提供），或人类裁决用其他格式化器"
+  },
+  "judgement_policy": {
+    "FAIL": "有黑名单/规范形违规，或有文件无法被 clang 解析",
+    "INCOMPLETE": "/src 与 /include 下没有源文件",
+    "PASS": "无违规且至少检查了 1 个文件（仍不含 clang-format 部分）"
+  },
+  "tested_at": "2026-11-24T04:55:08.818Z"
+}

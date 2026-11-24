@@ -1,0 +1,1667 @@
+{
+  "_comment": "th185.exe 里 [ecx+N] 偏移的访问方式统计。用于推断 thiscall 对象的字段语义。",
+  "_method": "扫全部 .text，对每个 [ecx+N] 按 mnemonic 归类（call_indirect/float/bitop/compare/read/write），再按比例推断语义类别。",
+  "_provenance": "全部来自反汇编统计，是 observed 不是 inferred 语义。类别标签（vtable_slot 等）是 inferred。",
+  "_caveat": "偏移相同不代表是同一个类——不同类的同偏移会被合并统计。要看具体类的布局必须限定在单个函数范围内（G2 的 facts_for_range 就是这么做的）。",
+  "total_offsets": 592,
+  "total_accesses": 4398,
+  "offsets": [
+    {
+      "offset": 4,
+      "offset_hex": "0x4",
+      "accesses": 376,
+      "by_kind": {
+        "read": 87,
+        "write": 204,
+        "bitop": 13,
+        "float": 40,
+        "compare": 27,
+        "push": 4,
+        "add": 1
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 8,
+      "offset_hex": "0x8",
+      "accesses": 261,
+      "by_kind": {
+        "read": 89,
+        "write": 85,
+        "float": 48,
+        "compare": 16,
+        "add": 1,
+        "call_indirect": 6,
+        "bitop": 14,
+        "sub": 2
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 12,
+      "offset_hex": "0xC",
+      "accesses": 186,
+      "by_kind": {
+        "read": 58,
+        "write": 78,
+        "movq": 4,
+        "float": 13,
+        "compare": 16,
+        "call_indirect": 11,
+        "inc": 1,
+        "bitop": 5
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 228,
+      "offset_hex": "0xE4",
+      "accesses": 162,
+      "by_kind": {
+        "read": 3,
+        "call_indirect": 156,
+        "write": 3
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1,
+      "offset_hex": "0x1",
+      "accesses": 123,
+      "by_kind": {
+        "write": 112,
+        "compare": 10,
+        "read": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1348,
+      "offset_hex": "0x544",
+      "accesses": 122,
+      "by_kind": {
+        "compare": 122
+      },
+      "inferred": [
+        "state_value"
+      ]
+    },
+    {
+      "offset": 84,
+      "offset_hex": "0x54",
+      "accesses": 121,
+      "by_kind": {
+        "bitop": 90,
+        "write": 5,
+        "read": 7,
+        "float": 11,
+        "movq": 3,
+        "call_indirect": 1,
+        "movups": 1,
+        "add": 3
+      },
+      "inferred": [
+        "bit_flags",
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 16,
+      "offset_hex": "0x10",
+      "accesses": 99,
+      "by_kind": {
+        "read": 35,
+        "float": 6,
+        "write": 35,
+        "compare": 7,
+        "movups": 3,
+        "movq": 2,
+        "call_indirect": 8,
+        "sub": 1,
+        "bitop": 2
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 20,
+      "offset_hex": "0x14",
+      "accesses": 87,
+      "by_kind": {
+        "read": 27,
+        "float": 16,
+        "write": 33,
+        "call_indirect": 2,
+        "movq": 1,
+        "compare": 4,
+        "add": 2,
+        "bitop": 2
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 268,
+      "offset_hex": "0x10C",
+      "accesses": 87,
+      "by_kind": {
+        "call_indirect": 86,
+        "read": 1
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 24,
+      "offset_hex": "0x18",
+      "accesses": 86,
+      "by_kind": {
+        "read": 36,
+        "float": 19,
+        "write": 20,
+        "bitop": 1,
+        "movq": 1,
+        "call_indirect": 2,
+        "compare": 6,
+        "movd": 1
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 28,
+      "offset_hex": "0x1C",
+      "accesses": 72,
+      "by_kind": {
+        "read": 22,
+        "call_indirect": 7,
+        "float": 3,
+        "write": 20,
+        "movq": 2,
+        "compare": 6,
+        "idiv": 4,
+        "bitop": 4,
+        "dec": 1,
+        "movd": 1,
+        "movups": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 32,
+      "offset_hex": "0x20",
+      "accesses": 66,
+      "by_kind": {
+        "read": 32,
+        "write": 12,
+        "float": 2,
+        "bitop": 8,
+        "movq": 2,
+        "compare": 6,
+        "call_indirect": 1,
+        "movups": 1,
+        "push": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 44,
+      "offset_hex": "0x2C",
+      "accesses": 61,
+      "by_kind": {
+        "read": 37,
+        "write": 5,
+        "float": 8,
+        "bitop": 1,
+        "call_indirect": 6,
+        "movq": 2,
+        "compare": 2
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 88,
+      "offset_hex": "0x58",
+      "accesses": 54,
+      "by_kind": {
+        "push": 18,
+        "write": 7,
+        "read": 17,
+        "compare": 3,
+        "inc": 2,
+        "float": 7
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 52,
+      "offset_hex": "0x34",
+      "accesses": 52,
+      "by_kind": {
+        "float": 14,
+        "movq": 2,
+        "read": 22,
+        "write": 2,
+        "call_indirect": 12
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 48,
+      "offset_hex": "0x30",
+      "accesses": 49,
+      "by_kind": {
+        "float": 4,
+        "write": 9,
+        "read": 22,
+        "compare": 5,
+        "movq": 2,
+        "call_indirect": 6,
+        "movups": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 56,
+      "offset_hex": "0x38",
+      "accesses": 48,
+      "by_kind": {
+        "float": 5,
+        "compare": 2,
+        "read": 27,
+        "write": 7,
+        "push": 1,
+        "call_indirect": 5,
+        "movups": 1
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 10,
+      "offset_hex": "0xA",
+      "accesses": 47,
+      "by_kind": {
+        "write": 43,
+        "read": 2,
+        "bitop": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 2,
+      "offset_hex": "0x2",
+      "accesses": 46,
+      "by_kind": {
+        "write": 40,
+        "read": 2,
+        "compare": 2,
+        "movq": 1,
+        "add": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 36,
+      "offset_hex": "0x24",
+      "accesses": 44,
+      "by_kind": {
+        "call_indirect": 4,
+        "write": 8,
+        "read": 25,
+        "compare": 3,
+        "float": 2,
+        "movq": 1,
+        "push": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 64,
+      "offset_hex": "0x40",
+      "accesses": 39,
+      "by_kind": {
+        "write": 7,
+        "read": 16,
+        "bitop": 1,
+        "call_indirect": 6,
+        "subsd": 1,
+        "float": 8
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1332,
+      "offset_hex": "0x534",
+      "accesses": 37,
+      "by_kind": {
+        "bitop": 21,
+        "write": 8,
+        "read": 8
+      },
+      "inferred": [
+        "bit_flags",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 72,
+      "offset_hex": "0x48",
+      "accesses": 36,
+      "by_kind": {
+        "read": 6,
+        "write": 5,
+        "float": 3,
+        "call_indirect": 19,
+        "movq": 2,
+        "addsd": 1
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 40,
+      "offset_hex": "0x28",
+      "accesses": 35,
+      "by_kind": {
+        "read": 12,
+        "float": 11,
+        "compare": 3,
+        "write": 5,
+        "call_indirect": 1,
+        "push": 3
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 60,
+      "offset_hex": "0x3C",
+      "accesses": 35,
+      "by_kind": {
+        "read": 17,
+        "float": 9,
+        "write": 5,
+        "call_indirect": 3,
+        "add": 1
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 68,
+      "offset_hex": "0x44",
+      "accesses": 33,
+      "by_kind": {
+        "float": 8,
+        "write": 8,
+        "read": 12,
+        "rcr": 1,
+        "call_indirect": 4
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 220,
+      "offset_hex": "0xDC",
+      "accesses": 32,
+      "by_kind": {
+        "write": 2,
+        "read": 4,
+        "float": 25,
+        "add": 1
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1520,
+      "offset_hex": "0x5F0",
+      "accesses": 31,
+      "by_kind": {
+        "float": 2,
+        "movq": 29
+      },
+      "inferred": []
+    },
+    {
+      "offset": 1528,
+      "offset_hex": "0x5F8",
+      "accesses": 31,
+      "by_kind": {
+        "float": 2,
+        "read": 28,
+        "write": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 216,
+      "offset_hex": "0xD8",
+      "accesses": 29,
+      "by_kind": {
+        "read": 3,
+        "float": 25,
+        "add": 1
+      },
+      "inferred": [
+        "float_field",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 356,
+      "offset_hex": "0x164",
+      "accesses": 22,
+      "by_kind": {
+        "write": 2,
+        "read": 3,
+        "call_indirect": 17
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 96,
+      "offset_hex": "0x60",
+      "accesses": 22,
+      "by_kind": {
+        "read": 9,
+        "write": 5,
+        "float": 8
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 3,
+      "offset_hex": "0x3",
+      "accesses": 22,
+      "by_kind": {
+        "write": 19,
+        "read": 2,
+        "bitop": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 848,
+      "offset_hex": "0x350",
+      "accesses": 21,
+      "by_kind": {
+        "bitop": 19,
+        "write": 1,
+        "read": 1
+      },
+      "inferred": [
+        "bit_flags",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 118,
+      "offset_hex": "0x76",
+      "accesses": 21,
+      "by_kind": {
+        "write": 21
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 140,
+      "offset_hex": "0x8C",
+      "accesses": 19,
+      "by_kind": {
+        "write": 4,
+        "inc": 1,
+        "read": 6,
+        "compare": 7,
+        "movups": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 164,
+      "offset_hex": "0xA4",
+      "accesses": 19,
+      "by_kind": {
+        "read": 11,
+        "write": 4,
+        "call_indirect": 3,
+        "compare": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1336,
+      "offset_hex": "0x538",
+      "accesses": 19,
+      "by_kind": {
+        "bitop": 2,
+        "write": 10,
+        "read": 7
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 92,
+      "offset_hex": "0x5C",
+      "accesses": 19,
+      "by_kind": {
+        "read": 10,
+        "write": 4,
+        "float": 3,
+        "call_indirect": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 102952,
+      "offset_hex": "0x19228",
+      "accesses": 19,
+      "by_kind": {
+        "read": 19
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 176,
+      "offset_hex": "0xB0",
+      "accesses": 18,
+      "by_kind": {
+        "read": 6,
+        "call_indirect": 8,
+        "bitop": 1,
+        "write": 1,
+        "lock xadd": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1256,
+      "offset_hex": "0x4E8",
+      "accesses": 18,
+      "by_kind": {
+        "float": 5,
+        "read": 13
+      },
+      "inferred": [
+        "float_field",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 80,
+      "offset_hex": "0x50",
+      "accesses": 18,
+      "by_kind": {
+        "write": 5,
+        "read": 6,
+        "float": 3,
+        "movq": 1,
+        "push": 1,
+        "fld": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 160,
+      "offset_hex": "0xA0",
+      "accesses": 18,
+      "by_kind": {
+        "read": 4,
+        "float": 12,
+        "write": 2
+      },
+      "inferred": [
+        "float_field",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 144,
+      "offset_hex": "0x90",
+      "accesses": 17,
+      "by_kind": {
+        "movq": 2,
+        "write": 7,
+        "read": 6,
+        "imul": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 156,
+      "offset_hex": "0x9C",
+      "accesses": 17,
+      "by_kind": {
+        "movq": 3,
+        "float": 1,
+        "read": 9,
+        "write": 3,
+        "compare": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 332,
+      "offset_hex": "0x14C",
+      "accesses": 16,
+      "by_kind": {
+        "read": 5,
+        "call_indirect": 10,
+        "movups": 1
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 108,
+      "offset_hex": "0x6C",
+      "accesses": 16,
+      "by_kind": {
+        "read": 6,
+        "float": 3,
+        "add": 4,
+        "write": 3
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 26684,
+      "offset_hex": "0x683C",
+      "accesses": 15,
+      "by_kind": {
+        "compare": 11,
+        "write": 3,
+        "push": 1
+      },
+      "inferred": [
+        "state_value",
+        "write_only"
+      ]
+    },
+    {
+      "offset": 102980,
+      "offset_hex": "0x19244",
+      "accesses": 15,
+      "by_kind": {
+        "read": 15
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 76,
+      "offset_hex": "0x4C",
+      "accesses": 15,
+      "by_kind": {
+        "read": 6,
+        "float": 2,
+        "write": 2,
+        "call_indirect": 5
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 172,
+      "offset_hex": "0xAC",
+      "accesses": 15,
+      "by_kind": {
+        "read": 4,
+        "call_indirect": 8,
+        "write": 3
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 276,
+      "offset_hex": "0x114",
+      "accesses": 14,
+      "by_kind": {
+        "read": 2,
+        "compare": 1,
+        "call_indirect": 11
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 284,
+      "offset_hex": "0x11C",
+      "accesses": 14,
+      "by_kind": {
+        "read": 1,
+        "write": 13
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 6,
+      "offset_hex": "0x6",
+      "accesses": 14,
+      "by_kind": {
+        "write": 10,
+        "read": 3,
+        "compare": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 100,
+      "offset_hex": "0x64",
+      "accesses": 13,
+      "by_kind": {
+        "read": 6,
+        "bitop": 2,
+        "write": 2,
+        "float": 2,
+        "movq": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 124,
+      "offset_hex": "0x7C",
+      "accesses": 13,
+      "by_kind": {
+        "write": 3,
+        "read": 5,
+        "idiv": 2,
+        "float": 3
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 8148324,
+      "offset_hex": "0x7C5564",
+      "accesses": 12,
+      "by_kind": {
+        "read": 9,
+        "write": 3
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 4724,
+      "offset_hex": "0x1274",
+      "accesses": 12,
+      "by_kind": {
+        "write": 2,
+        "float": 8,
+        "cvttss2si": 1,
+        "fld": 1
+      },
+      "inferred": [
+        "float_field",
+        "write_only"
+      ]
+    },
+    {
+      "offset": 120,
+      "offset_hex": "0x78",
+      "accesses": 12,
+      "by_kind": {
+        "read": 5,
+        "write": 3,
+        "bitop": 2,
+        "float": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 116,
+      "offset_hex": "0x74",
+      "accesses": 12,
+      "by_kind": {
+        "float": 4,
+        "read": 5,
+        "write": 1,
+        "compare": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 212,
+      "offset_hex": "0xD4",
+      "accesses": 11,
+      "by_kind": {
+        "read": 9,
+        "write": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 104,
+      "offset_hex": "0x68",
+      "accesses": 11,
+      "by_kind": {
+        "write": 2,
+        "read": 5,
+        "float": 2,
+        "add": 1,
+        "push": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 112,
+      "offset_hex": "0x70",
+      "accesses": 11,
+      "by_kind": {
+        "read": 7,
+        "inc": 1,
+        "compare": 1,
+        "add": 1,
+        "movups": 1
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 1432,
+      "offset_hex": "0x598",
+      "accesses": 11,
+      "by_kind": {
+        "write": 7,
+        "read": 3,
+        "compare": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 156360,
+      "offset_hex": "0x262C8",
+      "accesses": 11,
+      "by_kind": {
+        "write": 11
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 20280,
+      "offset_hex": "0x4F38",
+      "accesses": 11,
+      "by_kind": {
+        "compare": 1,
+        "read": 1,
+        "write": 9
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 25448,
+      "offset_hex": "0x6368",
+      "accesses": 10,
+      "by_kind": {
+        "bitop": 5,
+        "write": 3,
+        "read": 2
+      },
+      "inferred": [
+        "bit_flags",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 21904,
+      "offset_hex": "0x5590",
+      "accesses": 10,
+      "by_kind": {
+        "write": 10
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 224,
+      "offset_hex": "0xE0",
+      "accesses": 9,
+      "by_kind": {
+        "read": 7,
+        "write": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 168,
+      "offset_hex": "0xA8",
+      "accesses": 9,
+      "by_kind": {
+        "movq": 2,
+        "read": 2,
+        "inc": 1,
+        "write": 1,
+        "call_indirect": 3
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1568,
+      "offset_hex": "0x620",
+      "accesses": 9,
+      "by_kind": {
+        "write": 5,
+        "movq": 2,
+        "float": 2
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 128,
+      "offset_hex": "0x80",
+      "accesses": 9,
+      "by_kind": {
+        "read": 3,
+        "float": 4,
+        "movq": 1,
+        "write": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 148,
+      "offset_hex": "0x94",
+      "accesses": 9,
+      "by_kind": {
+        "read": 4,
+        "call_indirect": 5
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 102956,
+      "offset_hex": "0x1922C",
+      "accesses": 9,
+      "by_kind": {
+        "read": 9
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 8148336,
+      "offset_hex": "0x7C5570",
+      "accesses": 9,
+      "by_kind": {
+        "write": 9
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 1480,
+      "offset_hex": "0x5C8",
+      "accesses": 8,
+      "by_kind": {
+        "write": 7,
+        "push": 1
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 152,
+      "offset_hex": "0x98",
+      "accesses": 8,
+      "by_kind": {
+        "read": 8
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 180,
+      "offset_hex": "0xB4",
+      "accesses": 8,
+      "by_kind": {
+        "movq": 2,
+        "read": 5,
+        "write": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 188,
+      "offset_hex": "0xBC",
+      "accesses": 8,
+      "by_kind": {
+        "read": 8
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 208,
+      "offset_hex": "0xD0",
+      "accesses": 8,
+      "by_kind": {
+        "read": 8
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 192,
+      "offset_hex": "0xC0",
+      "accesses": 8,
+      "by_kind": {
+        "write": 3,
+        "read": 4,
+        "inc": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 102992,
+      "offset_hex": "0x19250",
+      "accesses": 8,
+      "by_kind": {
+        "read": 8
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 102996,
+      "offset_hex": "0x19254",
+      "accesses": 8,
+      "by_kind": {
+        "read": 8
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 1240,
+      "offset_hex": "0x4D8",
+      "accesses": 8,
+      "by_kind": {
+        "read": 2,
+        "float": 5,
+        "cvttss2si": 1
+      },
+      "inferred": [
+        "float_field",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 1776,
+      "offset_hex": "0x6F0",
+      "accesses": 8,
+      "by_kind": {
+        "write": 7,
+        "read": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1784,
+      "offset_hex": "0x6F8",
+      "accesses": 8,
+      "by_kind": {
+        "write": 7,
+        "read": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 4728,
+      "offset_hex": "0x1278",
+      "accesses": 7,
+      "by_kind": {
+        "float": 5,
+        "cvttss2si": 1,
+        "fld": 1
+      },
+      "inferred": [
+        "float_field"
+      ]
+    },
+    {
+      "offset": 136,
+      "offset_hex": "0x88",
+      "accesses": 7,
+      "by_kind": {
+        "float": 1,
+        "read": 4,
+        "write": 1,
+        "bitop": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 102955,
+      "offset_hex": "0x1922B",
+      "accesses": 7,
+      "by_kind": {
+        "read": 7
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 552,
+      "offset_hex": "0x228",
+      "accesses": 7,
+      "by_kind": {
+        "read": 3,
+        "write": 2,
+        "compare": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 5360,
+      "offset_hex": "0x14F0",
+      "accesses": 7,
+      "by_kind": {
+        "read": 4,
+        "write": 2,
+        "sub": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 344,
+      "offset_hex": "0x158",
+      "accesses": 6,
+      "by_kind": {
+        "read": 4,
+        "write": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 3356,
+      "offset_hex": "0xD1C",
+      "accesses": 6,
+      "by_kind": {
+        "compare": 6
+      },
+      "inferred": [
+        "state_value"
+      ]
+    },
+    {
+      "offset": 3140,
+      "offset_hex": "0xC44",
+      "accesses": 6,
+      "by_kind": {
+        "compare": 6
+      },
+      "inferred": [
+        "state_value"
+      ]
+    },
+    {
+      "offset": 295068,
+      "offset_hex": "0x4809C",
+      "accesses": 6,
+      "by_kind": {
+        "bitop": 5,
+        "read": 1
+      },
+      "inferred": [
+        "bit_flags",
+        "read_only"
+      ]
+    },
+    {
+      "offset": 448,
+      "offset_hex": "0x1C0",
+      "accesses": 6,
+      "by_kind": {
+        "read": 6
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 184,
+      "offset_hex": "0xB8",
+      "accesses": 6,
+      "by_kind": {
+        "read": 5,
+        "write": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1028,
+      "offset_hex": "0x404",
+      "accesses": 6,
+      "by_kind": {
+        "read": 2,
+        "write": 3,
+        "compare": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1244,
+      "offset_hex": "0x4DC",
+      "accesses": 6,
+      "by_kind": {
+        "read": 2,
+        "float": 3,
+        "cvttss2si": 1
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 1248,
+      "offset_hex": "0x4E0",
+      "accesses": 6,
+      "by_kind": {
+        "read": 2,
+        "movd": 1,
+        "write": 2,
+        "push": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1592,
+      "offset_hex": "0x638",
+      "accesses": 6,
+      "by_kind": {
+        "float": 2,
+        "write": 2,
+        "read": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 102984,
+      "offset_hex": "0x19248",
+      "accesses": 6,
+      "by_kind": {
+        "read": 6
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 25124,
+      "offset_hex": "0x6224",
+      "accesses": 6,
+      "by_kind": {
+        "write": 3,
+        "read": 2,
+        "fild": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 26676,
+      "offset_hex": "0x6834",
+      "accesses": 6,
+      "by_kind": {
+        "write": 2,
+        "read": 4
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1992,
+      "offset_hex": "0x7C8",
+      "accesses": 6,
+      "by_kind": {
+        "write": 6
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 1868,
+      "offset_hex": "0x74C",
+      "accesses": 6,
+      "by_kind": {
+        "write": 3,
+        "inc": 2,
+        "read": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 5406336,
+      "offset_hex": "0x527E80",
+      "accesses": 6,
+      "by_kind": {
+        "read": 1,
+        "write": 5
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 60237072,
+      "offset_hex": "0x3972510",
+      "accesses": 6,
+      "by_kind": {
+        "write": 2,
+        "read": 4
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1468,
+      "offset_hex": "0x5BC",
+      "accesses": 5,
+      "by_kind": {
+        "write": 2,
+        "read": 3
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 8148316,
+      "offset_hex": "0x7C555C",
+      "accesses": 5,
+      "by_kind": {
+        "read": 5
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 232,
+      "offset_hex": "0xE8",
+      "accesses": 5,
+      "by_kind": {
+        "read": 2,
+        "write": 1,
+        "compare": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 236,
+      "offset_hex": "0xEC",
+      "accesses": 5,
+      "by_kind": {
+        "read": 4,
+        "write": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 260,
+      "offset_hex": "0x104",
+      "accesses": 5,
+      "by_kind": {
+        "read": 1,
+        "write": 1,
+        "call_indirect": 3
+      },
+      "inferred": [
+        "vtable_slot",
+        "read_write"
+      ]
+    },
+    {
+      "offset": 296,
+      "offset_hex": "0x128",
+      "accesses": 5,
+      "by_kind": {
+        "read": 4,
+        "compare": 1
+      },
+      "inferred": [
+        "read_only"
+      ]
+    },
+    {
+      "offset": 564,
+      "offset_hex": "0x234",
+      "accesses": 5,
+      "by_kind": {
+        "read": 4,
+        "write": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1532,
+      "offset_hex": "0x5FC",
+      "accesses": 5,
+      "by_kind": {
+        "write": 4,
+        "read": 1
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 1792,
+      "offset_hex": "0x700",
+      "accesses": 5,
+      "by_kind": {
+        "write": 5
+      },
+      "inferred": [
+        "write_only"
+      ]
+    },
+    {
+      "offset": 1964,
+      "offset_hex": "0x7AC",
+      "accesses": 5,
+      "by_kind": {
+        "read": 3,
+        "write": 2
+      },
+      "inferred": [
+        "read_write"
+      ]
+    },
+    {
+      "offset": 5400,
+      "offset_hex": "0x1518",
+      "accesses": 5,
+      "by_kind": {
+        "write": 4,
+        "add": 1
+      },
+      "inferred": [
+        "write_only"
+      ]
+    }
+  ]
+}

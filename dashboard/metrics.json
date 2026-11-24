@@ -1,0 +1,67 @@
+{
+  "_comment": "AGENTS.md §11 仪表盘。人类唯一审查对象。禁止粉饰。",
+  "updated_at": "2026-11-24T14:02:33",
+  "phase": "bootstrap",
+  "gates_implemented": {
+    "G1": true,
+    "G2": false,
+    "G3": true,
+    "G4": true,
+    "G5": false,
+    "G6": false
+  },
+  "type_conflicts": null,
+  "witnessless_elements": 0,
+  "ub_reports": 0,
+  "perturbation_survival": null,
+  "hack_count_trend": null,
+  "cross_run_consensus": null,
+  "unresolved_count": 0,
+  "coverage": {
+    "matched": 54,
+    "total": 1678,
+    "ratio": 0.032181,
+    "_definition": "matched functions / binary call targets（call 目标作为可枚举函数下界）"
+  },
+  "_null_means": "null = 该指标尚未测得（对应门槛脚本未实现）。禁止填 0 冒充「无问题」。",
+  "_notes": {
+    "type_conflicts": "null = 尚无定义被测得（bootstrap 期 /src 与 /include 为空）",
+    "witnessless_elements": "G2 实测值。0 表示当前源码的见证声明全部命中；不表示二进制已被完全解释（见 reverse_coverage）",
+    "G6": "部分能力 UNSUPPORTED（无 RTTI 名 / 无 .pdata / 无多反编译器），gates_implemented.G6 记 false",
+    "G5": "INCOMPLETE：编译器缺口（缺 MSVC 27412/31328/31332）导致两个原文要求都无法执行"
+  },
+  "_g1_last_run": {
+    "failures": 0,
+    "definitions_checked": 0
+  },
+  "_g2_last_run": {
+    "status": "INCOMPLETE",
+    "instruction_count": 207516,
+    "binary_call_targets": 1678,
+    "witness_items": 56,
+    "function_coverage": 0.032181,
+    "matched_functions": 54
+  },
+  "_g4_last_run": {
+    "status": "PASS",
+    "files_checked": 4,
+    "violations": 0,
+    "clang_format_available": false
+  },
+  "_g3_last_run": {
+    "status": "PASS",
+    "functions": 35,
+    "failures": 0
+  },
+  "_g6_last_run": {
+    "status": "INCOMPLETE",
+    "vtables": 117,
+    "unsupported_count": 3
+  },
+  "_g5_last_run": {
+    "status": "INCOMPLETE",
+    "files_probed": 2,
+    "not_executed": 2,
+    "blockers": 1
+  }
+}
