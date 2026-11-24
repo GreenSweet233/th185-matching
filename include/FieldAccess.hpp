@@ -69,28 +69,10 @@ __m128 __fastcall read_44_as_m128(void* self, void* unused_edx);
 __m128 __fastcall mul_74_x_54(void* self, void* unused_edx);
 
 // --- 第三批：极简访问器 ---
-int __fastcall get_field_24(void* self, void* unused_edx);
-int __fastcall get_field_20(void* self, void* unused_edx);
-int* __fastcall addr_of_1C(void* self, void* unused_edx);
-int* __fastcall addr_of_620(void* self, void* unused_edx);
-void __fastcall clear_field_28(void* self, void* unused_edx);
 void* __fastcall return_const_addr(void* self, void* unused_edx);
-void __fastcall clear_low_nibble_at_40(void* self, void* unused_edx);
 
 // --- 第四批 ---
-int* __fastcall addr_of_1274(void* self, void* unused_edx);
-int __fastcall get_field_34(void* self, void* unused_edx);
-int __fastcall get_field_04(void* self, void* unused_edx);
-int* __fastcall addr_of_44(void* self, void* unused_edx);
-int __fastcall get_field_50(void* self, void* unused_edx);
-int __fastcall get_field_19260(void* self, void* unused_edx);
-int __fastcall get_field_47FAC(void* self, void* unused_edx);
 
 // --- 第六批 ---
-int __fastcall get_field_1C_int(void* self, void* unused_edx);
-int __fastcall get_field_00(void* self, void* unused_edx);
-int __fastcall get_field_3C(void* self, void* unused_edx);
-int* __fastcall addr_of_4FF4(void* self, void* unused_edx);
-int* __fastcall addr_of_1230(void* self, void* unused_edx);
 
 }  // namespace th185

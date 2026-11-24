@@ -130,44 +130,14 @@ __m128 __fastcall mul_74_x_54(void* self, void* unused_edx) {
 
 // --- 0x00406730：读 +0x24 ---
 // 字节: 8b4124c3 = mov eax,[ecx+0x24] ; ret
-//@witness func=0x00406730 kind=thiscall
-int __fastcall get_field_24(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField24Offset);
-}
-
 // --- 0x004176D0：读 +0x20 ---
 // 字节: 8b4120c3
-//@witness func=0x004176D0 kind=thiscall
-int __fastcall get_field_20(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField20Offset);
-}
-
 // --- 0x00429A50：取 +0x1c 的地址 ---
 // 字节: 8d411cc3 = lea eax,[ecx+0x1c] ; ret
-//@witness func=0x00429A50 kind=thiscall
-int* __fastcall addr_of_1C(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return INT_AT(self, kField1COffset);
-}
-
 // --- 0x00407E30：取 +0x620 的地址 ---
 // 字节: 8d8120060000c3
-//@witness func=0x00407E30 kind=thiscall
-int* __fastcall addr_of_620(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return INT_AT(self, kField620Offset);
-}
-
 // --- 0x00424480：清 +0x28 ---
 // 字节: c7412800000000c3 = mov dword [ecx+0x28],0 ; ret
-//@witness func=0x00424480 kind=thiscall
-void __fastcall clear_field_28(void* self, void* unused_edx) {
-    (void)unused_edx;
-    *INT_AT(self, kField28Offset) = 0;
-}
-
 // --- 0x00404BD0：返回常量地址 ---
 // 字节: b8689c5700c3 = mov eax,0x579C68 ; ret
 //@witness func=0x00404BD0 kind=cdecl
@@ -189,48 +159,6 @@ void __fastcall clear_low_nibble_at_40(void* self, void* unused_edx) {
 // 第四批：极简访问器（大偏移量与前几个字节）
 // ===========================================================================
 
-//@witness func=0x0040A090 kind=thiscall
-int* __fastcall addr_of_1274(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return INT_AT(self, kField1274Offset);
-}
-
-//@witness func=0x00417770 kind=thiscall
-int __fastcall get_field_34(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField34Offset);
-}
-
-//@witness func=0x00433B90 kind=thiscall
-int __fastcall get_field_04(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField04Offset);
-}
-
-//@witness func=0x00433DC0 kind=thiscall
-int* __fastcall addr_of_44(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return INT_AT(self, kSseField44Offset);
-}
-
-//@witness func=0x00431300 kind=thiscall
-int __fastcall get_field_50(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField50Offset);
-}
-
-//@witness func=0x00431260 kind=thiscall
-int __fastcall get_field_19260(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField19260Offset);
-}
-
-//@witness func=0x0040A0E0 kind=thiscall
-int __fastcall get_field_47FAC(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField47FACOffset);
-}
-
 // ===========================================================================
 // 第五批：含 call 的包装器
 // ===========================================================================
@@ -251,35 +179,5 @@ void __cdecl forward_to_cpu_probe(int features) {
 // ===========================================================================
 // 第六批：最后几个 2-7 字节纯访问器
 // ===========================================================================
-
-//@witness func=0x0041FA30 kind=thiscall
-int __fastcall get_field_1C_int(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField1COffset);
-}
-
-//@witness func=0x00433B40 kind=thiscall
-int __fastcall get_field_00(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField00Offset);
-}
-
-//@witness func=0x00441210 kind=thiscall
-int __fastcall get_field_3C(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return *INT_AT(self, kField3COffset);
-}
-
-//@witness func=0x00433DD0 kind=thiscall
-int* __fastcall addr_of_4FF4(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return INT_AT(self, kField4FF4Offset);
-}
-
-//@witness func=0x00433DF0 kind=thiscall
-int* __fastcall addr_of_1230(void* self, void* unused_edx) {
-    (void)unused_edx;
-    return INT_AT(self, kField1230Offset);
-}
 
 }  // namespace th185
