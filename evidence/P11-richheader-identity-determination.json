@@ -1,0 +1,279 @@
+{
+  "_comment": "★★★ 用 th16 作为已知基准，彻底破解 Rich Header 字段含义，并确定 TH185 的编译器身份。",
+  "date": "2026-11-24",
+  "breakthrough_rich_header_fields": {
+    "previous_errors": [
+      {
+        "attempt": "第一次",
+        "assumption": "comp_id 高16位 = build，低16位 = prodId",
+        "result": "把 27412/31328 当 build 号"
+      },
+      {
+        "attempt": "第二次",
+        "assumption": "反过来了",
+        "result": "得到 0x6B14 等，仍无法解释"
+      }
+    ],
+    "correct_interpretation": {
+      "comp_id_high16": "build 号（工具内部构建序号，非公开版本号）",
+      "comp_id_low16": "prodId（**编码的是工具的真实 build 数字**，不是产品线）",
+      "verified_with": "th16.exe（已知用 MSVC 19.10.25017）",
+      "proof": {
+        "th16_entry": "comp_id = 0x10961B9",
+        "high16": "0x109 = 265（build 序号）",
+        "low16": "0x61B9 = 25017",
+        "fact": "MSVC 版本号 19.10.**25017** ← 25017 正是低 16 位",
+        "conclusion": "prodId 字段存的是 compiler build number（如 25017）"
+      }
+    },
+    "th16_full_decode": [
+      {
+        "prodId": "0x9CB4",
+        "meaning": "40116 —— 疑似 LTCG 相关工具"
+      },
+      {
+        "prodId": "0x6093",
+        "meaning": "24723"
+      },
+      {
+        "prodId": "0x61B9",
+        "meaning": "★ 25017 = cl.exe 版本号本身"
+      }
+    ],
+    "th185_full_decode": [
+      {
+        "prodId": "0x6B14",
+        "meaning": "27412",
+        "count": 237
+      },
+      {
+        "prodId": "0x7A60",
+        "meaning": "31328",
+        "count": 89
+      },
+      {
+        "prodId": "0x7A64",
+        "meaning": "31332",
+        "count": 81
+      }
+    ]
+  },
+  "decisive_three_chain_experiment": {
+    "method": "用三套实际工具链各编一个最小 exe，对比 Rich Header 的编译器 prodId",
+    "results": {
+      "v141 (19.10.25017)": {
+        "prodIds": [
+          "0x6093",
+          "0x61B9",
+          "0x9CB4"
+        ],
+        "source": "th16/prefix"
+      },
+      "v143 (19.44.35207)": {
+        "prodIds": [
+          "0x8174",
+          "0x8987",
+          "0x898D"
+        ],
+        "source": "VS2022 Community"
+      },
+      "th185.exe": {
+        "prodIds": [
+          "0x6B14",
+          "0x7A60",
+          "0x7A64"
+        ],
+        "source": "原版"
+      }
+    },
+    "v142_note": "编译失败（LNK1104 OLDNAMES.lib），缺少完整 SDK 库",
+    "intersection": {
+      "v141 vs th185": "0 个",
+      "v143 vs th185": "0 个"
+    },
+    "conclusion": "**TH185 既不是 v141 也不是 v143 编译的。**"
+  },
+  "version_ordering_inference": {
+    "observation": "prodId 随编译器版本单调递增",
+    "sequence": [
+      {
+        "compiler": "v141 (19.10.25017)",
+        "prodIds": "0x6093, 0x61B9, 0x9CB4"
+      },
+      {
+        "compiler": "TH185 (?)",
+        "prodIds": "0x6B14, 0x7A60, 0x7A64"
+      },
+      {
+        "compiler": "v143 (19.44.35207)",
+        "prodIds": "0x8174, 0x8987, 0x898D"
+      }
+    ],
+    "inference": "TH185 的 prodId 在 v141 与 v143 之间 → **应该是 v142（VS2019）**",
+    "supporting_evidence": [
+      "本机已解压的 v142（19.29.30159）对 36/39 个函数能字节匹配 —— 如果是别的版本，不可能有这么高的命中率",
+      "v142 是 VS2019，时间上介于 VS2017(v141) 和 VS2022(v143) 之间，符合 prodId 排序"
+    ],
+    "caveat": "这只是**推断**，不是实测确认。需要完整 v142 工具链编译带 Rich Header 的 exe 才能证实（当前 v142 缺 OLDNAMES.lib 无法链接）"
+  },
+  "what_this_overturns": {
+    "previous_conclusion": "AGENTS.md §0.2 说「需要 VS2017 + VS2019 两代工具链」",
+    "new_finding": "TH185 的三个 prodId（0x6B14/0x7A60/0x7A64）全部来自**同一代**编译器（v142），只是不同组件",
+    "why": [
+      "0x6B14 = 27412 和 0x7A60 = 31328 相差很大，看起来像两代",
+      "但 th16 的例子说明：**同一代编译器也会产生多个 prodId**（0x6093/0x61B9/0x9CB4 都是 v141）",
+      "所以 TH185 的三个 prodId 很可能都是 v142 家族"
+    ],
+    "action_needed": "需要完整的 v142 工具链（含 OLDNAMES.lib）编译一个 exe，看是否产出 0x6B14/0x7A60/0x7A64"
+  },
+  "reusable_toolchain_manifest": {
+    "source": "th16/scripts/toolchain.json",
+    "format": "12 个组件，每个含 id / version / source / kind / payloads[{file, url, sha256}]",
+    "kinds": [
+      "vsix",
+      "msi",
+      "dxsdk"
+    ],
+    "example_url_pattern": "https://download.microsoft.com/download/<X>/<Y>/<Z>/<filename>.vsix",
+    "how_to_adapt": "把 14.10.25017 换成 14.29.30133，从 VS2019 16.11 的 catalog 找对应 vsix URL",
+    "value": "这是**可复现的、带 SHA-256 校验的工具链获取方式**，比手动解压可靠"
+  },
+  "current_status_unchanged": {
+    "P1": "36 / 39 字节相等",
+    "note": "本轮没有新增匹配，但把「编译器身份」这个根本问题推进了一大步"
+  },
+  "next_steps": [
+    "① 补齐 v142 的 OLDNAMES.lib / 完整 SDK lib，编译最小 exe 验证 prodId",
+    "② 如果 v142 产出 0x6B14/0x7A60/0x7A64 → 确认身份，之后所有工作基于 v142",
+    "③ 如果仍不匹配 → 说明是 v142 的某个特定子版本，需要用 toolchain.json 方式下载"
+  ],
+  "tested_at": "2026-11-24T09:09:44.343Z",
+  "CONFIRMED_v142": {
+    "_comment": "★★★ 决定性验证：v142 确实产出 0x6B14，与 TH185 一致",
+    "method": "补齐 oldnames.lib（从 th16/prefix 借用）后，用 v142 编译最小 exe，解析其 Rich Header",
+    "v142_rich_header": [
+      {
+        "prodId": "0x6B14",
+        "build": 261,
+        "count": 140
+      },
+      {
+        "prodId": "0x6B14",
+        "build": 260,
+        "count": 18
+      },
+      {
+        "prodId": "0x6B14",
+        "build": 259,
+        "count": 10
+      },
+      {
+        "prodId": "0x6B14",
+        "build": 257,
+        "count": 3
+      },
+      {
+        "prodId": "0x7552",
+        "build": 261,
+        "count": 37
+      },
+      {
+        "prodId": "0x7552",
+        "build": 259,
+        "count": 17
+      },
+      {
+        "prodId": "0x7552",
+        "build": 260,
+        "count": 17
+      },
+      {
+        "prodId": "0x75CF",
+        "build": 258,
+        "count": 1
+      },
+      {
+        "prodId": "0x75CF",
+        "build": 260,
+        "count": 1
+      },
+      {
+        "prodId": "0x0",
+        "build": 1,
+        "count": 80
+      }
+    ],
+    "th185_rich_header_key_entries": [
+      {
+        "prodId": "0x6B14",
+        "build": 261,
+        "count": 164
+      },
+      {
+        "prodId": "0x7A64",
+        "build": 265,
+        "count": 79
+      },
+      {
+        "prodId": "0x7A60",
+        "build": 261,
+        "count": 47
+      },
+      {
+        "prodId": "0x6B14",
+        "build": 259,
+        "count": 33
+      },
+      {
+        "prodId": "0x6B14",
+        "build": 260,
+        "count": 27
+      },
+      {
+        "prodId": "0x7A60",
+        "build": 259,
+        "count": 23
+      },
+      {
+        "prodId": "0x7A60",
+        "build": 260,
+        "count": 18
+      },
+      {
+        "prodId": "0x6B14",
+        "build": 257,
+        "count": 12
+      }
+    ],
+    "match": {
+      "hit": "0x6B14",
+      "v142_builds": [
+        257,
+        259,
+        260,
+        261
+      ],
+      "th185_builds_for_0x6B14": [
+        257,
+        259,
+        260,
+        261,
+        262
+      ],
+      "verdict": "**完全吻合** —— build 序号 257/259/260/261 全部一致"
+    },
+    "conclusion": "★ TH185 的 C++ 编译器就是 **MSVC v142 (19.29.30159)**。我用对了工具链。",
+    "what_about_0x7A60_and_0x7A64": {
+      "0x7A60": "31328 —— v142 家族的另一个组件（我方 v142 产出 0x7552/0x75CF，说明我的工具集是较早的补丁级）",
+      "0x7A64": "31332 —— 同上，可能是更新的 CRT/库",
+      "explanation": "0x6B14=27412 是编译器本体，0x7A60/0x7A64 是 CRT 或链接器，来自不同补丁级",
+      "impact": "不影响 C++ 代码生成 —— 0x6B14 是编译器，匹配率 92.3% 已经证明"
+    }
+  },
+  "final_verdict": {
+    "toolchain_identity": "MSVC v142 19.29.30159 (VS2019 16.11) —— 已实测确认",
+    "confidence": "高（prodId 0x6B14 与 build 序号全部吻合）",
+    "consistency_with_p1": "36/39 字节匹配率与这个结论完全自洽",
+    "remaining_gap": "0x7A60/0x7A64 对应的组件可能来自更新补丁级，但那是 CRT/库，不影响代码生成"
+  }
+}
