@@ -1,7 +1,7 @@
 # TH185 字节级匹配反编译 —— 现状与决策报告
 
-> 生成时间：2026-11-24
-> 仓库提交：194
+> 生成时间：2026-11-24（20:00 更新）
+> 仓库提交：16（th185-matching 独立后）
 > 本文件是给人类看的**单一入口**：当前进度、已验证的事实、需要你裁决的事项。
 > 数据全部来自实跑，不含估算。
 
@@ -21,8 +21,8 @@
 | 门禁 | 脚本 | 状态 | 说明 |
 |---|---|---|---|
 | G1 类型一致性 | `check_types.py` | ✅ PASS | |
-| G2 二进制见证 | `check_witness.py` | ⚠️ INCOMPLETE | 覆盖率 **80 / 1675 = 4.78%** |
-| G3 结构对齐 | `check_structure.py` | ✅ PASS | 但有 V2 待裁决 |
+| G2 二进制见证 | `check_witness.py` | ⚠️ INCOMPLETE | 覆盖率 **127 / 1675 = 7.58%** |
+| G3 结构对齐 | `check_structure.py` | ❌ **FAIL** | **46 项** token_ratio_excess（见 §3.6）|
 | G4 风格 | `check_style.py` | ✅ PASS | clang-format 缺失（FORMAT_UNAVAILABLE）|
 | G5 扰动稳定 | `check_stability.py` | ⚠️ INCOMPLETE | 编译器缺口 |
 | G6 独立证据 | `check_evidence.py` | ⚠️ INCOMPLETE | 3 项物理不可得 |
@@ -90,6 +90,15 @@ comp_id = 0x10961B9
   低16位 = 0x61B9 = 25017      ← 正是 cl.exe 版本号里的 25017
 ```
 
+### 3.1b ★ 当前真实状态（20:00 实测）
+
+```
+匹配函数    127 / 1675（7.58%）
+P1 字节验证  66 / 71（93.0%）
+G1 PASS | G4 PASS | G2+ PASS(51/51)
+G2 INCOMPLETE | G3 FAIL(46) | G5 INCOMPLETE | G6 INCOMPLETE
+```
+
 ### 3.2 五条代码生成规则（全部实测得出）
 
 | # | 规则 | 证据 |
@@ -132,6 +141,23 @@ __m128 __fastcall f(void* self, void* unused_edx) {
 - 即使用 `/arch:IA32` 强制走 x87（生成了 `fld`/`fstp`），**仍然是 `call`**
 - 原版出现 `fsincos` 说明它**静态链接了 x87 版 CRT**
 - 但 P1 只比对单函数 `.text`、不链接 CRT → **这 19 个函数永远无法用 C++ 源码匹配**（占 1.13%）
+
+### 3.6 G3 的 46 项 FAIL 是什么
+
+全部是 `token_ratio_excess`（token/指令比 > 4.0）。
+
+分布：
+
+| 文件 | 数量 | 原因 |
+|---|---:|---|
+| `Trivial.cpp` | 约 19 | 旧 `__fastcall` 写法（含 `fsincos` 那批）|
+| `SseAccess.cpp` | 11 | `__m128 ignored` 占位参数 |
+| `FieldWriter.cpp` | 8 | `__fastcall` + 哑参数 |
+| `Misc.cpp` | 约 12 | 常量返回 / 全局访问 |
+
+**已用「struct + 成员函数」解决 19 个**（`Object.cpp`），剩下 46 项待继续重构。
+
+详见 `ledger/G3-ABI-token-proposal.md`。
 
 ---
 

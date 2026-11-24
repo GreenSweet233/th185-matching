@@ -1,11 +1,11 @@
 {
   "_comment": "AGENTS.md §11 仪表盘。人类唯一审查对象。禁止粉饰。",
-  "updated_at": "2026-11-24T14:02:33",
+  "updated_at": "2026-11-24T19:56:52",
   "phase": "bootstrap",
   "gates_implemented": {
     "G1": true,
     "G2": false,
-    "G3": true,
+    "G3": false,
     "G4": true,
     "G5": false,
     "G6": false
@@ -18,9 +18,9 @@
   "cross_run_consensus": null,
   "unresolved_count": 0,
   "coverage": {
-    "matched": 54,
-    "total": 1678,
-    "ratio": 0.032181,
+    "matched": 127,
+    "total": 1675,
+    "ratio": 0.075821,
     "_definition": "matched functions / binary call targets（call 目标作为可枚举函数下界）"
   },
   "_null_means": "null = 该指标尚未测得（对应门槛脚本未实现）。禁止填 0 冒充「无问题」。",
@@ -36,22 +36,22 @@
   },
   "_g2_last_run": {
     "status": "INCOMPLETE",
-    "instruction_count": 207516,
-    "binary_call_targets": 1678,
-    "witness_items": 56,
-    "function_coverage": 0.032181,
-    "matched_functions": 54
+    "instruction_count": 203941,
+    "binary_call_targets": 1675,
+    "witness_items": 144,
+    "function_coverage": 0.075821,
+    "matched_functions": 127
   },
   "_g4_last_run": {
     "status": "PASS",
-    "files_checked": 4,
+    "files_checked": 14,
     "violations": 0,
     "clang_format_available": false
   },
   "_g3_last_run": {
-    "status": "PASS",
-    "functions": 35,
-    "failures": 0
+    "status": "FAIL",
+    "functions": 127,
+    "failures": 45
   },
   "_g6_last_run": {
     "status": "INCOMPLETE",
@@ -60,8 +60,21 @@
   },
   "_g5_last_run": {
     "status": "INCOMPLETE",
-    "files_probed": 2,
+    "files_probed": 7,
     "not_executed": 2,
     "blockers": 1
+  },
+  "behavioral_equivalence": {
+    "status": "PASS",
+    "cases": 51,
+    "passed": 51,
+    "method": "unicorn 执行原版机器码，与 Python 独立重算的语义对比",
+    "_not_p1": "行为等价 ≠ 字节相等；后者仍需编译器"
+  },
+  "byte_match": {
+    "status": "FAIL",
+    "matched": 66,
+    "verified": 71,
+    "_note": "只覆盖能单独编译验证的函数；其余仍只有静态门槛"
   }
 }
