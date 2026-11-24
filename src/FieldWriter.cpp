@@ -3,62 +3,29 @@
 namespace th185 {
 namespace fw {
 
-namespace {
-#define INT_AT(self, offset) \
-    reinterpret_cast<int*>(static_cast<char*>(self) + (offset))
-
-// 取 +offset 处的 byte 地址。★ 用宏的原因同 INT_AT（disp8 折叠）。
-#define BYTE_AT(self, offset) \
-    reinterpret_cast<char*>(static_cast<char*>(self) + (offset))
-}  // namespace
-
-//@witness func=0x004176E0 kind=thiscall
-void __fastcall set_34(void* self, void* unused_edx, int v) {
-    (void)unused_edx;
-    *INT_AT(self, 0x34) = v;
-}
-
-//@witness func=0x00428090 kind=thiscall
-void __fastcall set_28(void* self, void* unused_edx, int v) {
-    (void)unused_edx;
-    *INT_AT(self, 0x28) = v;
-}
-
-//@witness func=0x004280C0 kind=thiscall
-void __fastcall set_2C(void* self, void* unused_edx, int v) {
-    (void)unused_edx;
-    *INT_AT(self, 0x2C) = v;
-}
-
 //@witness func=0x00433BA0 kind=thiscall
-void __fastcall set_04(void* self, void* unused_edx, int v) {
-    (void)unused_edx;
-    *INT_AT(self, 0x04) = v;
-}
+void ObjFw04::set(int value) { f_04 = value; }
 
 //@witness func=0x00433BB0 kind=thiscall
-void __fastcall set_08(void* self, void* unused_edx, int v) {
-    (void)unused_edx;
-    *INT_AT(self, 0x08) = v;
-}
+void ObjFw08::set(int value) { f_08 = value; }
+
+//@witness func=0x00428090 kind=thiscall
+void ObjFw28::set(int value) { f_28 = value; }
+
+//@witness func=0x004280C0 kind=thiscall
+void ObjFw2C::set(int value) { f_2C = value; }
+
+//@witness func=0x004176E0 kind=thiscall
+void ObjFw34::set(int value) { f_34 = value; }
 
 //@witness func=0x004340A0 kind=thiscall
-void __fastcall set_278(void* self, void* unused_edx, int v) {
-    (void)unused_edx;
-    *INT_AT(self, 0x278) = v;
-}
+void ObjFw278::set(int value) { f_278 = value; }
 
 //@witness func=0x00440840 kind=thiscall
-void __fastcall set_3C(void* self, void* unused_edx, int v) {
-    (void)unused_edx;
-    *INT_AT(self, 0x3C) = v;
-}
+void ObjFw3C::set(int value) { f_3C = value; }
 
 //@witness func=0x00433B00 kind=thiscall
-void __fastcall set_1030_byte(void* self, void* unused_edx, char v) {
-    (void)unused_edx;
-    *BYTE_AT(self, 0x1030) = v;
-}
+void ObjFw1030::set(char value) { f_1030 = value; }
 
 }  // namespace fw
 }  // namespace th185

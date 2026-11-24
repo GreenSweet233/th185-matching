@@ -1,78 +1,122 @@
 #pragma once
 
 #include <xmmintrin.h>
-// 字段访问器族 —— 第二批匹配（P1 已验证字节相等）。
-//
-// 这批函数全部来自对 .text 的重新扫描，特点是：
-//   - 无 call、3-10 条指令
-//   - 原版保留完整栈帧（对应编译选项 /Oy-）
-//
-// 调用约定统一用 __fastcall + 哑 edx 模拟 thiscall。
 
-namespace th185 {
+/**
+ * 字段访问器族（第二批匹配）。
+ *
+ * 本文件只保留**这里独有的**函数。与 Trivial / Object / FieldWriter 重复的
+ * 定义已删除 —— 一个二进制地址只能有一处源码实现，否则 witness 出现歧义。
+ *
+ * ## 三种形态
+ *
+ * - 碰 ecx 的    -> 成员函数
+ * - 返回 __m128  -> 静态成员 + __fastcall（普通成员函数会走 sret）
+ * - 纯 stdcall   -> 具名参数的普通函数
+ */
 
-// 二进制见证的字段偏移（不是推测）。
-constexpr unsigned kField2A0Offset = 0x2A0;
-constexpr unsigned kField20Offset = 0x20;
-constexpr unsigned kVec3At5F0Offset = 0x5F0;
-constexpr unsigned kSseField44Offset = 0x44;
-constexpr unsigned kSseField74Offset = 0x74;
-constexpr unsigned kSseField54Offset = 0x54;
-constexpr unsigned kField24Offset = 0x24;
-constexpr unsigned kField1COffset = 0x1C;
-constexpr unsigned kField28Offset = 0x28;
-constexpr unsigned kField40Offset = 0x40;
-constexpr unsigned kField620Offset = 0x620;
-constexpr unsigned kField1274Offset = 0x1274;
-constexpr unsigned kField34Offset = 0x34;
-constexpr unsigned kField04Offset = 0x04;
-constexpr unsigned kField50Offset = 0x50;
-constexpr unsigned kField19260Offset = 0x19260;
-constexpr unsigned kField47FACOffset = 0x47FAC;
-constexpr unsigned kField00Offset = 0x00;
-constexpr unsigned kField3COffset = 0x3C;
-constexpr unsigned kField4FF4Offset = 0x4FF4;
-constexpr unsigned kField1230Offset = 0x1230;
+// 被 0x0048F711 调用的 CPU 特性探测函数（含 cpuid，473 字节）。
+// 这里只声明不实现 —— P1 比对时 rel32 是占位值，由 relocation 屏蔽。
+extern "C" void th185_CpuFeatureProbe(int features);
 
-// --- 0x00404D10：stdcall，3 参数，只返回第一个 ---
-// 字节: 55 8bec 8b4508 5d c20c00
+// ---------------------------------------------------------------------------
+// stdcall：3 个参数，只返回第一个（0x00404D10）
+// ---------------------------------------------------------------------------
+/// 字节: 55 8bec 8b4508 5d c20c00
 int __stdcall first_of_three(int a, int b, int c);
 
-// --- 0x00407E40：thiscall，返回 int（不是 bool） ---
-// 字节: 33c0 3981 a0020000 0f95c0 c3
-//
-// ★ 返回类型必须是 int 而非 bool：
-//   int  -> xor eax,eax (33c0) + cmp [ecx+0x2A0],eax (3981)
-//   bool -> cmp [ecx+0x2A0],0 (83b9)
-//   两者都 4 字节差异，但指令不同。
-int __fastcall is_field_2A0_set(void* self, void* unused_edx);
+// ---------------------------------------------------------------------------
+// int 返回而非 bool（0x00407E40）
+// ---------------------------------------------------------------------------
+/// 字节: 33c0 3981 a0020000 0f95c0 c3
+///
+/// ★ 返回类型必须是 int：
+///   int  -> xor eax,eax (33c0) + cmp [ecx+0x2A0],eax (3981)
+///   bool -> cmp [ecx+0x2A0],0 (83b9)
+struct ObjField2A0 {
+    char gap_00_2A0[0x2A0];  ///< +0x00..+0x2A0 未解析（无证据的区间）
+    int f_2A0;               ///< +0x2A0，见证 0x00407E40
 
-// --- 0x0040A050：thiscall，清零首字段并返回 this ---
-// 字节: c70100000000 8bc1 c3
-void* __fastcall clear_first_and_return_this(void* self, void* unused_edx);
+    int is_set();
+};
 
-// --- 0x00409F60：thiscall，写 +0x20 ---
-// 字节: 55 8bec 8b4508 894120 5d c20400
-void __fastcall set_field_20(void* self, void* unused_edx, int value);
+// ---------------------------------------------------------------------------
+// 清零首字段并返回 this（0x0040A050）
+// ---------------------------------------------------------------------------
+/// 字节: c70100000000 8bc1 c3
+struct ObjClearFirst {
+    int f_00;  ///< +0x00，见证 0x0040A050
 
-// --- 0x00433BC0 / 0x00406720：thiscall，写 +0x00 ---
-// 字节: 55 8bec 8b4508 8901 5d c20400
-void __fastcall set_first_field(void* self, void* unused_edx, int value);
+    ObjClearFirst* clear_and_return_this();
+};
 
-// --- 0x004063C0：thiscall，12 字节 struct 拷贝到 +0x5F0 ---
-// 字节: 55 8bec 8b4508 f30f7e00 660fd681f0050000 8b4008 8981f8050000 5d c20400
-void __fastcall copy_vec3_to_5F0(void* self, void* unused_edx, const void* src);
+// ---------------------------------------------------------------------------
+// 写 +0x20（0x00409F60）
+// ---------------------------------------------------------------------------
+/// 字节: 55 8bec 8b4508 894120 5d c20400
+struct ObjField20 {
+    char gap_00_20[0x20];  ///< +0x00..+0x20 未解析（无证据的区间）
+    int f_20;              ///< +0x20，见证 0x00409F60
 
-// --- SSE 标量访问（返回 __m128 而非 float）---
-__m128 __fastcall read_first_as_m128(void* self, void* unused_edx);
-__m128 __fastcall read_44_as_m128(void* self, void* unused_edx);
-__m128 __fastcall mul_74_x_54(void* self, void* unused_edx);
+    void set(int value);
+};
 
-// --- 第三批：极简访问器 ---
-void* __fastcall return_const_addr(void* self, void* unused_edx);
+// ---------------------------------------------------------------------------
+// 12 字节 struct 拷贝到 +0x5F0（0x004063C0）
+// ---------------------------------------------------------------------------
+/// 字节: 55 8bec 8b4508 f30f7e00 660fd681f0050000 8b4008 8981f8050000 5d c20400
+///
+/// 12 字节聚合类型必须 struct 整体赋值（见 Trivial.hpp 的 Vec3Raw 说明）。
+struct Vec3Raw {
+    int x;
+    int y;
+    int z;
+};
 
-// --- 第四批 ---
+struct ObjField5F0 {
+    char gap_00_5F0[0x5F0];  ///< +0x00..+0x5F0 未解析（无证据的区间）
+    Vec3Raw f_5F0;           ///< +0x5F0..+0x5FC 的 12 字节向量，见证 0x004063C0
 
-// --- 第六批 ---
+    void copy_from(const Vec3Raw* source);
+};
 
-}  // namespace th185
+// ---------------------------------------------------------------------------
+// SSE 标量读取（返回 __m128，不是 float）
+// ---------------------------------------------------------------------------
+/// 0x00405A60：`f30f104144 c3`（movss xmm0,[ecx+0x44]）。
+struct ObjSse44Load {
+    char gap_00_44[0x44];  ///< +0x00..+0x44 未解析（无证据的区间）
+    float f_44;            ///< +0x44，见证 0x00405A60
+
+    static __m128 __fastcall load(ObjSse44Load* self);
+};
+
+// ---------------------------------------------------------------------------
+// SSE 标量乘法（0x0041C710）
+// ---------------------------------------------------------------------------
+/// 字节: f30f104174 f30f594154 c3
+///
+/// ★ 第二个操作数保持**内存形式**：
+///   _mm_mul_ss(a, _mm_load_ss(&b)) -> 先 load 到寄存器再 mul（字节不符）
+///   _mm_mul_ss(a, *(__m128*)&b)    -> mulss 直接读内存（MATCH）
+struct ObjMul7454 {
+    char gap_00_54[0x54];  ///< +0x00..+0x54 未解析（无证据的区间）
+    float f_54;            ///< +0x54，见证 0x0041C710
+    char gap_58_74[0x74 - 0x58];  ///< +0x58..+0x74 未解析（无证据的区间）
+    float f_74;                   ///< +0x74，见证 0x0041C710
+
+    /// ★ 静态成员 + __fastcall，不是普通成员函数。
+    /// 实测普通成员函数返回 __m128 走 sret（`mov eax,[ebp+8]; ...; ret 4`，
+    /// 23 字节），与原版 11 字节的 `f30f104174 f30f594154 c3` 不符。
+    static __m128 __fastcall mul(ObjMul7454* self);
+};
+
+// ---------------------------------------------------------------------------
+// 含 call 的包装器（0x0048F711）
+// ---------------------------------------------------------------------------
+/// 字节: 558bec ff7508 e863090000 59 5d c3
+///
+/// ★ 两个关键：
+///   ① 必须 /Os 而非 /O2 —— 只有 /Os 生成 `pop ecx` 而非 `add esp,4`
+///   ② 必须 cdecl 且返回 void —— 末尾是 c3 而非 c20400
+void __cdecl forward_to_cpu_probe(int features);

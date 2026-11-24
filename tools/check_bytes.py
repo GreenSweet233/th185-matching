@@ -22,6 +22,7 @@ r"""P1 字节级匹配验证器：编译源码，与 /orig 的 .text 逐字节�
 import argparse
 import json
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -138,6 +139,105 @@ def parse_coff_relocs(path, section_bytes):
     return ranges
 
 
+def expand_project_includes(text, include_dir, seen=None, depth=0):
+    """把 `#include "X.hpp"` 就地展开成 X.hpp 的内容（递归）。
+
+    ## 为什么需要（BUG FIX C）
+
+    本脚本原来只处理 `#include <...>`（系统头），**完全忽略** `#include "..."`
+    （工程头）—— 行被直接丢掉。后果是工程头之间无法复用：
+
+        想按 AGENTS.md §3「类型只允许在 /include 定义」把结构体布局集中到
+        Object.hpp，让 SseAccess.hpp 去 `#include "Object.hpp"`，
+        结果 Object.hpp 的内容根本进不了翻译单元，编译报 "未定义的类型"。
+
+    于是每个 hpp 只能各自重复一份布局 —— 而这正是 G1「同一 struct 在多个 TU
+    里定义必须一致」要防的漂移。
+
+    修法：把引号形式的工程头就地展开。只认 include/ 下真实存在的文件，
+    其余（如 <cmath>）不动。
+
+    ## 防环
+
+    seen 记录已展开过的绝对路径，重复时返回空串，避免 A->B->A 无限递归。
+    """
+    import re as _re
+    if seen is None:
+        seen = set()
+    if depth > 8:
+        return text
+    out = []
+    for ln in text.split("\n"):
+        m = _re.match(r'\s*#\s*include\s+"([^"]+)"\s*$', ln)
+        if not m:
+            out.append(ln)
+            continue
+        rel = m.group(1).replace("\\", "/")
+        cand = os.path.join(include_dir, rel)
+        if not os.path.isfile(cand):
+            # 工程头找不到：原样保留会被编译器报错，但那是真实错误，不掩盖。
+            out.append(ln)
+            continue
+        ap = os.path.abspath(cand)
+        if ap in seen:
+            continue
+        seen.add(ap)
+        try:
+            with open(cand, encoding="utf-8", errors="replace") as fh:
+                inner = fh.read()
+        except OSError:
+            out.append(ln)
+            continue
+        out.append(expand_project_includes(inner, include_dir, seen, depth + 1))
+    return "\n".join(out)
+
+
+def hpp_namespace_chain(hpp_text):
+    """返回 hpp 在**文件作用域**上依次打开的 namespace 名列表。
+
+    ## 为什么需要（BUG FIX B）
+
+    本脚本拼翻译单元时，把 hpp 的声明放在前面、把从 .cpp 抠出的**函数定义**
+    放在后面。若 hpp 里的 struct 包在 `namespace th185 { ... }` 中，
+    而函数定义是 `int Obj00::get_00() {...}`（hpp 的 namespace 包裹没有一并带过来），
+    MSVC 会报：
+
+        error C2653: "Obj00": 不是类或命名空间名称
+        error C2065: "f_00": 未声明的标识符
+
+    修法：把函数定义放回 hpp 当初打开的同一串 namespace 里。
+
+    ## 口径
+
+    只收「在花括号深度 0 处」出现的 `namespace X {`。
+    深度用逐行累加花括号估算（hpp 里不会有字符串/注释干扰到根层结构）。
+    """
+    # 用「栈」记录当前打开的 namespace，并保留**遇到的最深一链**。
+    #
+    # 旧版只在花括号深度 0 处收集，结果是 `namespace th185 { namespace misc {`
+    # 只识别出 th185，漏掉 misc —— 函数被塞进错误的命名空间，报 C2653。
+    # 本项目确实存在两层嵌套（Misc.hpp 的 th185::misc、FieldWriter.hpp 的 th185::fw），
+    # 所以必须按栈处理，不能只看最外层。
+    stack = []
+    opened = []  # (name, depth_when_opened)
+    deepest = []
+    depth = 0
+    for ln in hpp_text.split("\n"):
+        s = ln.split("//")[0]
+        m = re.match(r"\s*namespace\s+([A-Za-z_]\w*)\s*\{", s)
+        if m:
+            stack.append(m.group(1))
+            opened.append((m.group(1), depth))
+            if len(stack) > len(deepest):
+                deepest = list(stack)
+        depth += s.count("{") - s.count("}")
+        # 弹出已经关闭的 namespace
+        while opened and depth <= opened[-1][1]:
+            opened.pop()
+            stack.pop()
+    return deepest
+
+
 def bytes_match_with_relocs(ours, orig, relocs):
     """比较两段字节，忽略重定位占位区。
 
@@ -205,83 +305,92 @@ def main():
     flags = args.flags.split()
     results = []
 
-    # 每个条目：(标签, 地址, 源文件, 函数名, 额外前缀, 额外flags)
-    # 额外前缀用于把 __fastcall 模拟的声明也带进去
-    targets = [
-        ("0x00402A50", 0x00402A50, "Timer.cpp", "tick_timer", True),
-        ("0x00404AA0", 0x00404AA0, "Trivial.cpp", "return_this", True),
-        ("0x00404C20", 0x00404C20, "Trivial.cpp", "do_nothing", False),
-        ("0x0041FA20", 0x0041FA20, "Trivial.cpp", "read_first_field", True),
-        ("0x00404B70", 0x00404B70, "Trivial.cpp", "polar_to_vec2", True),
-        ("0x004903B9", 0x004903B9, "Trivial.cpp", "return_zero", False),
-        ("0x00405830", 0x00405830, "Trivial.cpp", "copy_vec3", True),
-        ("0x00406720", 0x00406720, "Trivial.cpp", "set_first_field", True),
-        ("0x00417750", 0x00417750, "Trivial.cpp", "polar_to_vec2_scaled", True),
-        ("0x0049DC88", 0x0049DC88, "Trivial.cpp", "encode_value", False),
-        ("0x00404D10", 0x00404D10, "FieldAccess.cpp", "first_of_three", False),
-        ("0x00407E40", 0x00407E40, "FieldAccess.cpp", "is_field_2A0_set", True),
-        ("0x0040A050", 0x0040A050, "FieldAccess.cpp", "clear_first_and_return_this", True),
-        ("0x00409F60", 0x00409F60, "FieldAccess.cpp", "set_field_20", True),
-        ("0x00433BC0", 0x00433BC0, "FieldAccess.cpp", "set_first_field", True),
-        ("0x004063C0", 0x004063C0, "FieldAccess.cpp", "copy_vec3_to_5F0", True),
-        ("0x00404B60", 0x00404B60, "FieldAccess.cpp", "read_first_as_m128", True),
-        ("0x00405A60", 0x00405A60, "FieldAccess.cpp", "read_44_as_m128", True),
-        ("0x0041C710", 0x0041C710, "FieldAccess.cpp", "mul_74_x_54", True),
-        ("0x00404BD0", 0x00404BD0, "FieldAccess.cpp", "return_const_addr", True),
-        ("0x00429AB0", 0x00429AB0, "FieldAccess.cpp", "clear_low_nibble_at_40", True),
-        ("0x00433B90", 0x00433B90, "FieldAccess.cpp", "get_field_04", True),
-        # ★ 这个函数需要 /Os（生成 pop ecx 而非 add esp,4）
-        ("0x0048F711", 0x0048F711, "FieldAccess.cpp", "forward_to_cpu_probe", False, "/MT /Os /GS- /Oy-"),
-        ("0x00429A40", 0x00429A40, "SseAccess.cpp", "load_18", True),
-        ("0x00441240", 0x00441240, "SseAccess.cpp", "load_28", True),
-        ("0x00441250", 0x00441250, "SseAccess.cpp", "load_2C", True),
-        ("0x00441330", 0x00441330, "SseAccess.cpp", "load_20", True),
-        ("0x00441340", 0x00441340, "SseAccess.cpp", "load_24", True),
-        ("0x00441600", 0x00441600, "SseAccess.cpp", "load_04", True),
-        ("0x004415F0", 0x004415F0, "SseAccess.cpp", "store_00", True),
-        ("0x004415E0", 0x004415E0, "SseAccess.cpp", "store_04", True),
-        ("0x00417780", 0x00417780, "SseAccess.cpp", "store_18", True),
-        ("0x004299F0", 0x004299F0, "SseAccess.cpp", "store_24", True),
-        ("0x00429A00", 0x00429A00, "SseAccess.cpp", "store_20", True),
-        ("0x00441270", 0x00441270, "SseAccess.cpp", "store_2C", True),
-        ("0x00441320", 0x00441320, "SseAccess.cpp", "store_34", True),
-        ("0x00441310", 0x00441310, "SseAccess.cpp", "store_38", True),
-        ("0x004341D0", 0x004341D0, "SseAccess.cpp", "store_6C", True),
-        ("0x004341E0", 0x004341E0, "SseAccess.cpp", "store_74", True),
-        ("0x004341F0", 0x004341F0, "SseAccess.cpp", "store_78", True),
-        ("0x0045C9E0", 0x0045C9E0, "Misc.cpp", "return_579C70", True),
-        ("0x00490556", 0x00490556, "Misc.cpp", "return_4000", True),
-        ("0x004905C1", 0x004905C1, "Misc.cpp", "return_57A3A4", True),
-        ("0x004905C7", 0x004905C7, "Misc.cpp", "return_57A3A0", True),
-        ("0x0049056E", 0x0049056E, "Misc.cpp", "return_true", True),
-        ("0x004407F0", 0x004407F0, "Misc.cpp", "clear_3C", True),
-        ("0x00440B40", 0x00440B40, "Misc.cpp", "clear_50", True),
-        ("0x00433DE0", 0x00433DE0, "Misc.cpp", "set_bit_6368", True),
-        ("0x0049EBDE", 0x0049EBDE, "Misc.cpp", "read_global_4D74F8", True),
-        ("0x00490463", 0x00490463, "Misc.cpp", "zero_global_4D72F4", True),
-        ("0x00429A10", 0x00429A10, "Misc.cpp", "set_flags_40_bits1", True),
-        ("0x00441260", 0x00441260, "Misc.cpp", "set_flags_40_bits01", True),
-        ("0x00429B90", 0x00429B90, "Misc.cpp", "store_48_4C", True),
-        ("0x00441620", 0x00441620, "Misc.cpp", "mul_78_x_58", True),
-        ("0x0048AC40", 0x0048AC40, "Misc.cpp", "set_534_and_store_44", True),
-        ("0x00433820", 0x00433820, "Misc.cpp", "store_44_via_global", True),
-        ("0x00433850", 0x00433850, "Misc.cpp", "load_via_global", True),
-        ("0x0049EEBB", 0x0049EEBB, "Misc.cpp", "return_addr_4D750C", True),
-        ("0x004A1726", 0x004A1726, "Misc.cpp", "return_addr_4D7818", True),
-        ("0x004A172C", 0x004A172C, "Misc.cpp", "return_addr_4D781C", True),
-        ("0x004A1732", 0x004A1732, "Misc.cpp", "return_addr_4D7814", True),
-        ("0x004A1738", 0x004A1738, "Misc.cpp", "read_global_4D7820", True),
-        ("0x004A173E", 0x004A173E, "Misc.cpp", "read_global_4D7824", True),
-        ("0x004176E0", 0x004176E0, "FieldWriter.cpp", "set_34", True),
-        ("0x00428090", 0x00428090, "FieldWriter.cpp", "set_28", True),
-        ("0x004280C0", 0x004280C0, "FieldWriter.cpp", "set_2C", True),
-        ("0x00433BA0", 0x00433BA0, "FieldWriter.cpp", "set_04", True),
-        ("0x00433BB0", 0x00433BB0, "FieldWriter.cpp", "set_08", True),
-        ("0x004340A0", 0x004340A0, "FieldWriter.cpp", "set_278", True),
-        ("0x00440840", 0x00440840, "FieldWriter.cpp", "set_3C", True),
-        ("0x00433B00", 0x00433B00, "FieldWriter.cpp", "set_1030_byte", True),
-    ]
+    # ------------------------------------------------------------------
+    # 目标列表：**从 //@witness 声明自动推导**，不再手工维护。
+    #
+    # 为什么改（2026-11-24）：
+    #   旧版是一张手写的 71 项白名单。于是出现了一个隐蔽的漏洞 ——
+    #   源码里声明了 witness、但忘了加进这张表的函数，**从未被字节比对过**，
+    #   却在 dashboard / docs/MATCHED.md 里被算作「已匹配」。
+    #   实测：127 个有源码的函数里有 57 个不在表内
+    #   （Trivial.cpp 41 个 + Object.cpp 16 个），全部未验证。
+    #   手工维护的清单必然会与源码漂移，改成自动推导后这类漏检不可能再发生。
+    #
+    # 附带修掉一处更隐蔽的问题：旧代码会在编译前**改写源码**
+    # （need_this=True 时自动插入 __fastcall）。那意味着被验证的不是仓库里的代码。
+    # 现在一律不改写，调用约定必须由源码自己写清楚。
+    # ------------------------------------------------------------------
 
+    # 每个地址的编译 flags 覆盖（只有极少数函数需要 /Os，见 toolchain.lock 规则 5）
+    FLAG_OVERRIDES = {
+        "0x0048F711": "/MT /Os /GS- /Oy-",
+    }
+
+    def _func_name_after(lines, marker_idx, fn_hint=None):
+        """从 witness 标记行往下找函数定义，取出函数名。
+
+        取「定义行里 "(" 之前最后一个标识符」——对
+            int Obj00::get_00() { ... }
+            void* return_579C68() { ... }
+        都成立。
+        """
+        for j in range(marker_idx + 1, min(marker_idx + 20, len(lines))):
+            s = lines[j].strip()
+            if not s or s.startswith("//"):
+                continue
+            if "(" not in s:
+                continue
+            head = s.split("(", 1)[0]
+            # ★ 必须返回 "Class::name" 而不是光秃秃的 "name"。
+            #
+            # 踩过的坑：FieldWriter 里有 8 个 `set`（ObjFw04::set、ObjFw08::set ...），
+            # 旧代码只取最后一个标识符 -> 全都返回 "set" -> 定位时统统命中文件里
+            # 第一个 `set(`，于是 8 个函数比的其实是同一段源码，
+            # 除第一个外全部报 DIFF（而且差异看起来像"偏移错了"，极具误导性）。
+            m_q = re.search(r"([A-Za-z_]\w*)\s*::\s*([A-Za-z_]\w*)\s*$", head)
+            if m_q:
+                return m_q.group(1) + "::" + m_q.group(2)
+            ids = re.findall(r"[A-Za-z_]\w*", head)
+            if not ids:
+                continue
+            # 去掉 __fastcall / __stdcall / __cdecl 这类关键字
+            ids = [x for x in ids if not x.startswith("__")]
+            if ids:
+                return ids[-1]
+        return fn_hint
+
+    decls = cw.parse_witnesses(os.path.join(root, "src"))
+
+    targets = []
+    _seen = set()
+    for _addr in sorted(decls):
+        if _addr.startswith("<file:"):
+            continue
+        _item = next((it for it in decls[_addr] if it["kind"] == "func"), None)
+        if _item is None:
+            continue
+        _src_file = os.path.basename(_item["file"])
+        if not _src_file.endswith(".cpp"):
+            continue
+        try:
+            with open(_item["file"], encoding="utf-8", errors="replace") as _fh:
+                _lines = _fh.read().split("\n")
+        except OSError:
+            continue
+        _fn = _func_name_after(_lines, _item["line"] - 1)
+        if not _fn:
+            print("  (warn: cannot infer function name for %s in %s)"
+                  % (_addr, _src_file))
+            continue
+        _key = (_addr, _src_file, _fn)
+        if _key in _seen:
+            continue
+        _seen.add(_key)
+        targets.append((_addr, int(_addr, 16), _src_file, _fn, False,
+                        FLAG_OVERRIDES.get(_addr)))
+
+    print("  targets : %d（由 //@witness 自动推导）" % len(targets))
+    print()
     for label, va, src_name, fn_name, need_this, *rest in targets:
         extra_flags = rest[0] if rest else None
         lo, hi = cw.function_extent(label, insns)
@@ -297,24 +406,33 @@ def main():
         with open(src_path, encoding="utf-8") as fh:
             src = fh.read()
 
-        # 提取单个函数：从 //@witness func= 之后到下一个 //@witness 或文件尾
+        # 提取单个函数：定位**定义行**。
+        #
+        # ★ 2026-11-24 重写。旧版是「先在 //@witness 注释附近找、再全文兜底」，
+        #   但兜底那条会在多个同名重载里命中第一个：
+        #   FieldWriter 有 8 个 set()，于是 7 个函数比的是别人的源码。
+        #   现在直接用**限定名**（Class::name）定位定义行，不再靠“附近”。
         lines = src.split("\n")
         idx = None
         import re as _re2
-        for k, ln in enumerate(lines):
-            if "//@witness func=" in ln and fn_name in "\n".join(lines[max(0,k):k+18]):
-                for j in range(k + 1, min(k + 18, len(lines))):
-                    if _re2.search(r"\b" + _re2.escape(fn_name) + r"\s*\(", lines[j]):
-                        idx = j
-                        break
-                if idx is not None:
-                    break
-        # 兜底：全文搜函数定义
-        if idx is None:
-            for j, ln in enumerate(lines):
-                if _re2.search(r"\b" + _re2.escape(fn_name) + r"\s*\(", ln) and "//" not in ln.split(fn_name)[0]:
-                    idx = j
-                    break
+
+        def _is_definition(ln):
+            """该行是否是 fn_name 的定义（而不是调用/声明）。"""
+            if "//" in ln.split(fn_name)[0] if fn_name in ln else False:
+                return False
+            if not _re2.search(r"\b" + _re2.escape(fn_name) + r"\s*\(", ln):
+                return False
+            # 调用语句以 ; 结尾；定义后面跟 { 或换行后的 {
+            stripped = ln.strip()
+            if stripped.endswith(";"):
+                return False
+            return True
+
+        for j, ln in enumerate(lines):
+            if _is_definition(ln):
+                idx = j
+                break
+
         if idx is None:
             results.append({"func": label, "status": "SKIP",
                             "error": "cannot locate %s in %s" % (fn_name, src_name)})
@@ -335,12 +453,12 @@ def main():
 
         func_text = "\n".join(body_lines)
 
-        # 如果是 __fastcall 模拟，需要把调用约定写进去（源文件里可能没写）
-        if need_this and "__fastcall" not in func_text:
-            # 在函数名前的返回类型后插入 __fastcall
-            import re as _re
-            func_text = _re.sub(r"(\n)([A-Za-z_][\w\s\*]*?)\s+" + fn_name + r"\s*\(",
-                                r"\1\2 __fastcall " + fn_name + "(", func_text, count=1)
+        # ★ 2026-11-24 移除「编译前自动插入 __fastcall」。
+        #
+        # 旧代码在 need_this=True 时会把 `void f(...)` 改写成
+        # `void __fastcall f(...)` 再编译 —— 这意味着 **被比对的不是仓库里的代码**。
+        # 一个源码里没写 __fastcall 的函数，也可能因此「匹配成功」。
+        # 调用约定是源码事实，必须由源码自己写清楚，工具不得代劳。
 
         # 前置需要的定义：
         #   1) hpp 里的 constexpr / static const 常量
@@ -434,13 +552,56 @@ def main():
         if is_member and hpp_for_inc and os.path.isfile(hpp_for_inc):
             with open(hpp_for_inc, encoding="utf-8") as fh:
                 hpp_text = fh.read()
+            # BUG FIX C：把 `#include "..."` 工程头就地展开，
+            # 否则 hpp 之间无法复用结构体定义（只能各自复制一份布局）。
+            hpp_text = expand_project_includes(
+                hpp_text, os.path.join(root, "include"))
+            # 展开后可能带出新的系统头（如展开 Object.hpp 后出现 <xmmintrin.h>）
+            for _ln in hpp_text.split("\n"):
+                if _ln.strip().startswith("#include <") and _ln not in sys_includes:
+                    sys_includes.append(_ln)
             decl_lines = []
             for ln in hpp_text.split("\n"):
                 s2 = ln.strip()
                 if s2.startswith("#pragma") or s2.startswith("#include"):
                     continue
                 decl_lines.append(ln)
-            body = "\n".join(decl_lines) + "\n" + body
+
+            # ---- BUG FIX A: declarations must come AFTER #include ----
+            #
+            # Old code did `body = decl_lines + body`, but `body` already
+            # began with `#include <...>`, so the final TU order was:
+            #     <struct decls using __m128>      <- BEFORE the include
+            #     #include <xmmintrin.h>            <- too late
+            # MSVC then reported C2061 (unknown __m128) / C2143, and the
+            # whole member-function branch failed to compile.
+            includes_part = ("\n".join(sys_includes) + "\n") if sys_includes else ""
+            if includes_part and body.startswith(includes_part):
+                tail = body[len(includes_part):]
+            else:
+                includes_part, tail = "", body
+
+            # ---- BUG FIX B: put the definition back in the hpp namespace ----
+            #
+            # hpp declares `namespace th185 { struct Obj00 {...}; }` while
+            # func_text is `int Obj00::get_00() {...}` with no namespace.
+            # Splicing them verbatim gives C2653 "Obj00 is not a class or
+            # namespace name".
+            ns_chain = hpp_namespace_chain(hpp_text)
+            if ns_chain:
+                open_ns = "".join("namespace %s {\n" % n for n in ns_chain)
+                close_ns = "".join("}\n" for _ in ns_chain)
+                wrapped = open_ns + func_text + "\n" + close_ns
+            else:
+                wrapped = func_text
+
+            # 保留 prefix（匿名 namespace 辅助定义 / extern 声明 / constexpr），
+            # 它原本在 body 的 include 段之后、func_text 之前。
+            if func_text in tail:
+                prefix_part = tail.split(func_text, 1)[0]
+            else:
+                prefix_part = ""
+            body = includes_part + "\n".join(decl_lines) + "\n" + prefix_part + wrapped
 
         use_flags = (extra_flags.split() if extra_flags else flags)
         with tempfile.TemporaryDirectory() as td:

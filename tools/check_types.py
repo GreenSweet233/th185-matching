@@ -146,7 +146,7 @@ def run_clang_ast(clang, cpp_path, include_dirs, std="c++17"):
         return None, "AST is not valid JSON: %s" % exc
 
 
-def collect_records(node, out, source_prefixes):
+def collect_records(node, out, source_prefixes, state=None):
     """递归收集 CXXRecordDecl / EnumDecl。
 
     只收定义（completeDefinition 或 EnumDecl 有 enumerators），
@@ -157,17 +157,53 @@ def collect_records(node, out, source_prefixes):
         return
     kind = node.get("kind")
     loc = node.get("loc") or {}
-    f = loc.get("file") or ""
+
+    # ---- BUG FIX（G1，2026-11-24）：恢复被 clang 省略的 file 字段 ----
+    #
+    # clang 的 `-ast-dump=json` **只在 file 变化时才输出 file 键**（省带宽）。
+    # 于是「在 hpp 里定义、被 cpp include 进来」的 struct，其 loc 里没有
+    # `file`，只有 `includedFrom.file`。旧代码只看 loc.file，判 in_scope=False，
+    # 把这些 struct **全部静默丢弃**。
+    #
+    # 实测后果：include/*.hpp 里有 59 个 struct 定义，G1 只认出 2 个，
+    # 却照样报 [PASS] —— 一个几乎没有被测对象的 PASS。
+    #
+    # 修法：按**文档顺序**遍历（clang 输出即文档顺序），维护一个"当前文件"
+    # 状态；loc 没给 file 时沿用上一个。这与 clang 自身的省略语义一致。
+    if state is not None:
+        if loc.get("file"):
+            state["file"] = loc["file"]
+        elif loc.get("includedFrom", {}).get("file") and not state.get("file"):
+            pass
+        f = loc.get("file") or state.get("file") or ""
+    else:
+        f = loc.get("file") or ""
+
     # clang 给的 loc.file 可能是相对路径（"include\\Enemy.hpp"），也可能
     # 是绝对路径。用「规范化后是否落在 src/ 或 include/ 下」判定，
     # 不做前缀比较——前缀比较会因相对/绝对混用而永远不匹配，
     # 结果是 definitions_checked=0 却报 PASS（我曾踩过）。
     in_scope = False
     if f:
-        f_norm = f.replace("\\", "/").lower()
+        # ---- BUG FIX (G1, 2026-11-24): path test must be a REAL containment test.
+        #
+        # The old code used a substring test
+        #     ("/" + pref + "/") in f_norm
+        # which also matches Windows SDK paths, because those look like
+        #     c:/program files (x86)/windows kits/10/include/10.0.19041.0/ucrt/...
+        #                                    ^^^^^^^ contains "/include/"
+        # So structs from system headers (__mm_load_ss_struct etc.) were
+        # treated as "our types".
+        #
+        # This stayed hidden only because loc.file was missing; once that was
+        # fixed, this latent misclassification immediately pulled ~60 system
+        # types into the statistics.
+        #
+        # Now uses os.path prefix semantics (normalized, case-insensitive).
+        f_norm = os.path.normcase(os.path.normpath(os.path.abspath(f)))
         for pref in source_prefixes:
-            p_norm = pref.replace("\\", "/").lower().rstrip("/")
-            if f_norm.startswith(p_norm + "/") or ("/" + p_norm + "/") in ("/" + f_norm):
+            p_norm = os.path.normcase(os.path.normpath(os.path.abspath(pref)))
+            if f_norm == p_norm or f_norm.startswith(p_norm + os.sep):
                 in_scope = True
                 break
 
@@ -188,7 +224,7 @@ def collect_records(node, out, source_prefixes):
                     "kind": "enum", "file": f, "fields": [],
                 })
     for child in node.get("inner") or []:
-        collect_records(child, out, source_prefixes)
+        collect_records(child, out, source_prefixes, state)
 
 
 def extract_fields(record_node, records_out):
@@ -274,7 +310,8 @@ def main():
             continue
         found = {}
         # 同时接受绝对路径和相对路径两种 loc.file 形态。
-        collect_records(ast, found, [src, inc, "src", "include"])
+        collect_records(ast, found, [src, inc, "src", "include"],
+                        state={"file": path})
         for name, defs in found.items():
             all_records.setdefault(name, []).extend(defs)
 

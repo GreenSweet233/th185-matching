@@ -1,163 +1,175 @@
 #pragma once
-// 极简叶子函数组 —— Phase A 语义重建。
-//
-// 这些函数的反汇编形状完全相同，是「同一段源码在多个类里实例化」的典型。
-// 按 AGENTS.md §5「叶子/简单函数先行」的原则，它们是第一批匹配对象。
-//
-// ## 形状 A：`mov eax, ecx; ret`（3 字节）
-//
-// ```
-// mov eax, ecx     ; eax = this
-// ret
-// ```
-//
-// thiscall 返回 this 指针。C++ 里对应返回 `*this` 或自身指针的访问器。
-// 例：0x00417AF0（15 个调用方）、0x00404AA0（6 个调用方）
-//
-// ## 形状 B：`ret 0`（3 字节）
-//
-// ```
-// ret 0            ; stdcall/thiscall 的零参数空函数返回
-// ```
-//
-// 空函数体。13 个函数共享此形状（0x00404C20 有 11 个调用方）。
-// 典型用途：虚函数的空实现（纯虚之外的默认空体）。
-//
-// ## 形状 C：`mov eax, [ecx]; ret`（3 字节）
-//
-// ```
-// mov eax, [ecx]   ; 读首字段
-// ret
-// ```
-//
-// 返回 this 的第一个 32 位字段。例：0x0041FA20（7 个调用方）
 
-namespace th185 {
+// __m128 / _mm_load_ss 需要这个头（形状 D 的返回类型是 __m128）。
+#include <xmmintrin.h>
 
-// --- 形状 A：返回 this ---
-//
-// 用 void* 而不是具体类型：本函数不碰任何字段，
-// 具体类型目前无证据（AGENTS §0 第 3 条），不编造。
-void* __fastcall return_this(void* self, void* unused_edx);
+/**
+ * 极简叶子函数组。
+ *
+ * ## 关键：原版是 C++ 类，`ecx` 就是 `this`
+ *
+ * 这些函数在原版里几乎都是**成员函数**。写成成员函数有三个好处：
+ *   1. 编译器自动用 ecx 传 this，不需要 `__fastcall` 伪装
+ *   2. 不需要哑参数 `unused_edx`
+ *   3. token 数自然下降 —— G3 的 token/指令比因此合规
+ *
+ * 实测对照（同一个二进制函数 0x00404AA0）：
+ *
+ *   成员函数   ObjReturnThis* ObjReturnThis::self()          token 7   8bc1c3  ✓
+ *   自由函数   void* __fastcall return_this(void*, void*)    token 11  8bc1c3  ✓
+ *
+ * 两者字节完全相同，但自由的写法把 G3 顶到 5.50（上限 4.0）。
+ *
+ * ## 关于命名空间
+ *
+ * 原版的类在哪个 namespace 里**没有证据**（无 RTTI：原版用 /GR-）。
+ * 所以这里把所有 struct 放在全局作用域 —— 这是一个中性的选择，
+ * 不构成「原版类在全局作用域」的事实主张。
+ */
 
-// --- 形状 B：空函数 ---
-//
-// 无参数、无返回值、无副作用。
-void do_nothing();
+// ---------------------------------------------------------------------------
+// 形状 A：`mov eax, ecx; ret`（8bc1c3）—— 返回 this
+// ---------------------------------------------------------------------------
+/// 2 个二进制函数：0x00404AA0（6 个调用方）、0x00417AF0（15 个调用方）。
+struct ObjReturnThis {
+    /// 返回自身指针。见证 0x00404AA0、0x00417AF0（均为 `8bc1c3`）。
+    ObjReturnThis* self();
+};
 
-// --- 形状 C：读首字段 ---
-//
-// 返回 *reinterpret_cast<unsigned*>(self)。
-unsigned __fastcall read_first_field(void* self, void* unused_edx);
+// ---------------------------------------------------------------------------
+// 形状 B：`ret`（c3）—— 空函数
+// ---------------------------------------------------------------------------
+/// 13 个二进制函数共享 `c3`。0x00404C20 有 11 个调用方。
+///
+/// 典型用途：虚函数的空实现。原版是 thiscall（ecx=this）但不用 this，
+/// 所以写成**无参数的成员函数** —— MSVC 对「不碰 this 的成员函数」
+/// 仍按 thiscall 生成 `ret`，与本形状一致。
+struct ObjEmpty {
+    void noop();
+};
 
-// --- 形状 D：读首字段为 float ---
-//
-// `movss xmm0, [ecx]; ret` —— 与形状 C 只差数据宽度。
-float __fastcall read_first_float(void* self, void* unused_edx);
+// ---------------------------------------------------------------------------
+// 形状 C：`mov eax, [ecx]; ret`（8b01c3）—— 读首字段
+// ---------------------------------------------------------------------------
+/// 2 个：0x0041FA20（7 个调用方）、0x00433B40（4 个调用方）。
+struct ObjFirstInt {
+    int f_00;  ///< +0x00，见证 0x0041FA20 / 0x00433B40（`mov eax,[ecx]`）
 
-// --- 形状 E：极坐标 → Vec2（`fsincos` 形状，20 个函数共享）---
-//
-// 反汇编（0x00404B70，20 个之一）：
-//
-//   mov eax, [ebp-4]        ; eax = this
-//   fld  dword [ebp+8]      ; st0 = angle
-//   fsincos                 ; st0 = sin(angle), st1 = cos(angle)
-//   fmul dword [ebp+0xC]    ; * length
-//   fstp dword [eax]        ; this->x = sin(angle) * length
-//   fmul dword [ebp+0xC]    ; * length
-//   fstp dword [eax+4]      ; this->y = cos(angle) * length
-//   ret 8                   ; stdcall/thiscall，2 个 float 参数
-//
-// 语义：给定角度与长度，算出 (cos*len, sin*len) 写进 this 的前两个 float。
-//
-// ★★ 这里我错过一次，值得记录。
-//
-//   我原本从 fsincos 的 x87 栈序推断「st0=sin、st1=cos，第一次 fstp 弹出 sin
-//   写到 [eax]，所以 x=sin」。听起来很合理，**但错了**。
-//
-//   用 unicorn 实际执行 0x00404B70 得到：
-//     angle=0.0, length=2.0  ->  x=2.0, y=0.0
-//   而 sin(0)=0、cos(0)=1，所以 x 必然是 cos*length。
-//
-//   实测结论：x = cos(angle)*length，y = sin(angle)*length。
-//
-//   **教训**：x87 栈序推断容易出错（fsincos 的 st0/st1 顺序、fstp 的弹出语义、
-//   以及 fmul 作用在哪一层，任一处记错都会导致结论反了）。这类语义必须实测。
-void __fastcall polar_to_vec2(void* self, void* unused_edx, float angle, float length);
+    int get_00();
+};
 
-// --- 形状 F：返回 0（`xor eax, eax; ret`）---
-//
-// `xor eax, eax` 是 MSVC 生成 `return 0;` 的标准方式（比 mov eax,0 短 2 字节）。
-// 4 个函数：0x004903B9 / 0x00490553 / 0x0049055C / 0x0049055F
+// ---------------------------------------------------------------------------
+// 形状 D：`movss xmm0,[ecx]; ret`（f30f1001c3）—— 读首字段为 float
+// ---------------------------------------------------------------------------
+/// 2 个：0x00404B60、0x00441610。
+///
+/// ★ 返回类型必须是 `__m128` 而不是 `float`：
+///   float  -> d9 01        fld dword [ecx]     （x87 栈）
+///   __m128 -> f3 0f 10 01  movss xmm0,[ecx]    （SSE 寄存器）✓
+///
+/// 原版走 XMM0，所以返回类型是 __m128。
+struct ObjFirstFloat {
+    float f_00;  ///< +0x00，见证 0x00404B60 / 0x00441610（`movss xmm0,[ecx]`）
+
+    /// 注意：写成**静态成员 + __fastcall** 而不是普通成员函数。
+    /// 实测普通成员函数返回 __m128 会走 sret（隐藏返回指针）：
+    ///   `mov eax,[ebp+8]; movss [eax],xmm0; ret 4`  ✗
+    /// 静态成员只取一个对象指针参数，生成 `movss xmm0,[ecx]; ret` ✓
+    static __m128 __fastcall load(ObjFirstFloat* self);
+};
+
+// ---------------------------------------------------------------------------
+// 形状 F：`xor eax,eax; ret`（33c0c3）—— 返回 0
+// ---------------------------------------------------------------------------
+/// 4 个：0x004903B9 / 0x00490553 / 0x0049055C / 0x0049055F。
+/// 无参数、不碰 ecx —— 普通函数。
 int return_zero();
 
-// --- 形状 G：Vec3 拷贝（`movq` + 8 字节）---
-//
-// 反汇编（0x00405830）：
-//
-//   mov  eax, [ebp+8]     ; eax = src
-//   movq xmm0, [eax]      ; xmm0 = src[0..7]  （前 8 字节，两个 float）
-//   movq [ecx], xmm0      ; this[0..7] = xmm0
-//   mov  eax, [eax+8]     ; eax = src[8..11] （第三个 float）
-//   mov  [ecx+8], eax     ; this[8..11] = eax
-//   ret  4
-//
-// 即 `*this = *src`，12 字节 = 3 个 float（Vec3）。
-// MSVC 用 movq 拷前 8 字节 + mov 拷剩余 4 字节，是 12 字节结构体的标准拷贝序列。
-// 3 个函数：0x00405830 / 0x00417730 / 0x00441650
-void __fastcall copy_vec3(void* self, void* unused_edx, const void* source);
+// ---------------------------------------------------------------------------
+// 形状 G：12 字节聚合拷贝（movq + mov）
+// ---------------------------------------------------------------------------
+/// 12 字节向量：3 个 int32。
+///
+/// ★ 必须用 struct 整体赋值。实测逐字段 3 次赋值生成 3 条 mov（18 字节），
+///   整体赋值才生成原版那样的 `movq xmm0(8字节) + mov(4字节)`。
+struct Vec3Raw {
+    int x;
+    int y;
+    int z;
+};
 
-// --- 形状 H：写首字段为 u32（`mov [ecx], eax; ret 4`）---
-//
-// 反汇编（0x00406720）：
-//
-//   mov eax, [ebp+8]      ; eax = value
-//   mov [ecx], eax        ; this[0..3] = value
-//   ret 4
-//
-// 即 `this->first = value`。3 个函数：0x00406720 / 0x00433BC0 / 0x00433C80
-void __fastcall set_first_field(void* self, void* unused_edx, unsigned value);
+/// 3 个：0x00405830 / 0x00417730 / 0x00441650。
+struct ObjVec3 {
+    Vec3Raw f_00;  ///< +0x00..+0x0C 的 12 字节向量，见证 0x00405830
 
-// --- 形状 E2：极坐标 → Vec2，x/y 用**不同的** length（椭圆）---
-//
-// 反汇编（0x00417750，`ret 0xC` = 3 个参数）：
-//
-//   fld  dword [ebp+8]      ; st0 = angle
-//   fsincos                 ; st0 = sin, st1 = cos
-//   fmul dword [ebp+0xC]    ; * length_x
-//   fstp dword [eax]        ; x = sin(angle) * length_x
-//   fmul dword [ebp+0x10]   ; * length_y   <- 不同的参数！
-//   fstp dword [eax+4]      ; y = cos(angle) * length_y
-//   ret 0xC
-//
-// 与形状 E 的区别：E 用同一个 length 乘两次（圆），
-// 这里 x 和 y 各用一个（椭圆 / 各向异性缩放）。
-//
-// ★ 实测：x = cos(angle) * length_x，y = sin(angle) * length_y（同形状 E 的修正）。
-//
-// 2 个函数：0x00417750 / 0x00441580
-void __fastcall polar_to_vec2_scaled(void* self, void* unused_edx,
-                                     float angle, float length_x, float length_y);
+    void copy_from(const Vec3Raw* source);
+};
 
-// --- 形状 I：指针编码（MSVC /GS 的 __security_check_cookie 用法）---
-//
-// 反汇编（0x0049DC88）：
-//
-//   mov  eax, dword [0x4C8A4C]   ; __security_cookie
-//   and  eax, 0x1F               ; cookie & 31
-//   push 0x20
-//   pop  ecx                     ; ecx = 32
-//   sub  ecx, eax                ; ecx = 32 - (cookie & 31)  旋转量
-//   mov  eax, dword [ebp+8]      ; value
-//   ror  eax, cl                 ; 右旋
-//   xor  eax, dword [0x4C8A4C]   ; 再与 cookie 异或
-//   ret
-//
-// 这是**指针编码**（encode/decode），不是哈希：
-// 同一个变换应用两次会还原（ror + xor 的组合）。
-// MSVC 用它来混淆返回值里的指针。
-//
-// 5 个函数：0x0049DC88 / 0x0049E757 / 0x0049E776 / 0x0049EB13 / 0x0049EBF3
+// ---------------------------------------------------------------------------
+// 形状 H：`mov [ecx], eax; ret 4` —— 写首字段
+// ---------------------------------------------------------------------------
+/// 3 个：0x00406720 / 0x00433BC0 / 0x00433C80。
+struct ObjFirstIntSetter {
+    int f_00;  ///< +0x00
+
+    void set_00(int value);
+};
+
+// ---------------------------------------------------------------------------
+// 形状 E / E2：极坐标 → Vec2（fsincos 形状）
+// ---------------------------------------------------------------------------
+/// 20 个函数共享 `fsincos` 形状（0x00404B70 等）。
+///
+/// ## ★★ 这里我错过一次，值得记录
+///
+/// 我原本从 fsincos 的 x87 栈序推断「st0=sin、st1=cos，第一次 fstp 弹出 sin
+/// 写到 [eax]，所以 x=sin」。听起来合理，**但错了**。
+///
+/// 用 unicorn 实际执行 0x00404B70 得到：
+///   angle=0.0, length=2.0  ->  x=2.0, y=0.0
+/// 而 sin(0)=0、cos(0)=1，所以 x 必然是 cos*length。
+///
+/// **教训**：x87 栈序推断容易出错，这类语义必须实测。
+///
+/// ## 但字节上永远无法匹配（见 docs/STATUS.md）
+///
+/// 原版用 x87 复合指令 `fsincos`（d9fb），而 MSVC 前端**永不**内联出该指令
+/// （跨 v141/v142 穷举 60 种组合都不出现），它是静态链接的 x87 CRT 内部实现。
+/// 所以这 20 个函数的源码只保留「语义」，**不声称字节匹配**。
+struct ObjPolar {
+    float x;  ///< +0x00
+    float y;  ///< +0x04
+
+    void set_circle(float angle, float length);
+    void set_scaled(float angle, float length_x, float length_y);
+};
+
+// ---------------------------------------------------------------------------
+// 形状 I：指针编码（rotl + xor cookie）
+// ---------------------------------------------------------------------------
+/// 5 个：0x0049DC88 / 0x0049E757 / 0x0049E776 / 0x0049EB13 / 0x0049EBF3。
+///
+/// 原版的移位量是 `32 - (cookie & 31)`，可能等于 32。
+/// x86 的 `ror eax, cl` 对 32 位操作数把 CL **按 5 位掩码**，
+/// 所以 cl=32 时实际旋转 0 次。
+///
+/// ★ 写成 `(v >> s) | (v << (32-s))` 在 s==32 时是**未定义行为**。
+///   这里先掩码到 0..31，与 x86 硬件行为一致。
 unsigned encode_value(unsigned value);
 
-}  // namespace th185
+// ---------------------------------------------------------------------------
+// 形状：返回常量地址
+// ---------------------------------------------------------------------------
+/// 0x00404BD0（`b8 689c5700 c3`）。无参数、不碰 ecx —— 普通函数。
+void* return_579C68();
+
+// ---------------------------------------------------------------------------
+// 形状：`and dword [ecx+0x40], 0xFFFFFFF0; ret`
+// ---------------------------------------------------------------------------
+/// 0x00429AB0（`836140f0c3`）。
+struct ObjFlags40 {
+    char gap_00_40[0x40];  ///< +0x00..+0x40 未解析（无证据的区间）
+    unsigned f_40;         ///< +0x40，见证 0x00429AB0
+
+    void clear_low_nibble();
+};
