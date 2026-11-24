@@ -1,16 +1,16 @@
 {
   "_comment": "AGENTS.md §11 仪表盘。人类唯一审查对象。禁止粉饰。",
-  "updated_at": "2026-11-24T19:56:52",
+  "updated_at": "2026-11-24T20:51:14",
   "phase": "bootstrap",
   "gates_implemented": {
     "G1": true,
     "G2": false,
-    "G3": false,
+    "G3": true,
     "G4": true,
     "G5": false,
     "G6": false
   },
-  "type_conflicts": null,
+  "type_conflicts": 0,
   "witnessless_elements": 0,
   "ub_reports": 0,
   "perturbation_survival": null,
@@ -32,13 +32,13 @@
   },
   "_g1_last_run": {
     "failures": 0,
-    "definitions_checked": 0
+    "definitions_checked": 57
   },
   "_g2_last_run": {
     "status": "INCOMPLETE",
     "instruction_count": 203941,
     "binary_call_targets": 1675,
-    "witness_items": 144,
+    "witness_items": 135,
     "function_coverage": 0.075821,
     "matched_functions": 127
   },
@@ -49,9 +49,9 @@
     "clang_format_available": false
   },
   "_g3_last_run": {
-    "status": "FAIL",
+    "status": "PASS",
     "functions": 127,
-    "failures": 45
+    "failures": 0
   },
   "_g6_last_run": {
     "status": "INCOMPLETE",
@@ -73,8 +73,8 @@
   },
   "byte_match": {
     "status": "FAIL",
-    "matched": 66,
-    "verified": 71,
+    "matched": 102,
+    "verified": 127,
     "_note": "只覆盖能单独编译验证的函数；其余仍只有静态门槛"
   }
 }
