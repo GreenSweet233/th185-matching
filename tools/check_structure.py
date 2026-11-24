@@ -231,45 +231,14 @@ def source_structure(clang, path, include_dirs, func_label, marker_line=None,
     except OSError:
         lines = []
     code_tokens = 0
-    abi_tokens = 0
     for idx, ln in enumerate(lines, 1):
         if not (lo_line <= idx <= hi_line):
             continue
         s = ln.strip()
         if not s or s.startswith("//") or s.startswith("*") or s.startswith("/*"):
             continue
-        # ★ 排除 ABI 适配的 token 计数
-        #
-        # 背景：P1（字节匹配）需要把普通函数写成 `__fastcall` + 哑 edx 参数
-        # 来模拟 thiscall（MSVC 不允许自由函数用 __thiscall）。
-        # 这会引入两类「不为语义服务、只为 ABI 匹配」的 token：
-        #
-        #   void* __fastcall return_this(void* self, void* unused_edx) {
-        #       (void)unused_edx;     <- 这行纯粹为了消 warning
-        #       return self;
-        #   }
-        #
-        # 一个 2 条指令的函数因此从 5 个 token 涨到 11 个，token/指令比 5.50。
-        #
-        # 这不是「源码啰嗦」，是**两个门禁的真实需求冲突**：
-        #   P1 要求 __fastcall 才能字节相等
-        #   G3 要求 token/指令比 <= 4.0
-        #
-        # 正确做法不是放宽 G3 的阈值（那会放水），而是**把 ABI 适配开销单独计量**：
-        # 这些 token 不随函数复杂度增长，是固定成本。
-        if "(void)unused_edx" in s or "(void)unused_" in s:
-            abi_tokens += len(s.split())
-            continue
-        toks = len(s.split())
-        # 签名行里的 __fastcall 和哑参数也算 ABI 开销
-        if "__fastcall" in s:
-            toks -= 1
-            if "unused_" in s:
-                toks -= 2
-            toks = max(toks, 1)
-        code_tokens += toks
+        code_tokens += len(s.split())
     counts["tokens_est"] = code_tokens
-    counts["abi_tokens_excluded"] = abi_tokens
     return counts, ""
 
 
@@ -456,9 +425,6 @@ def main():
                 print("    branch : src=%d bin=%d tol=%d %s"
                       % (bc["source"], bc["binary_cond_jumps"], bc["tolerance"],
                          "OK" if bc["ok"] else "EXCESS"))
-            abi = (s or {}).get("abi_tokens_excluded", 0)
-            if abi:
-                print("    ABI    : %d token 已从统计中扣除（见 ledger/violations.md V2）" % abi)
             tr = e.get("token_ratio")
             if tr:
                 print("    ratio  : %.2f (max %.1f) %s"
