@@ -11,6 +11,9 @@ unsigned g_at_4D72F4 = 0;
 void* g_p_kitchen = nullptr;
 unsigned g_at_4D7820 = 0;
 unsigned g_at_4D7824 = 0;
+int g_57A3A8 = 0;
+int g_4C8A60 = 0;
+void* g_p_4D7B08 = nullptr;
 
 // ===========================================================================
 // 形态 1：不碰 ecx —— 普通函数
@@ -68,6 +71,18 @@ void* return_addr_4D7814() { return reinterpret_cast<void*>(0x004D7814u); }
 void* load_via_global() {
     return *reinterpret_cast<void**>(static_cast<char*>(g_p_kitchen) + 0xE6BB2C);
 }
+
+//@witness func=0x004340F0 kind=cdecl
+void* load_chain_4D7B08() {
+    char* stage = *reinterpret_cast<char**>(static_cast<char*>(g_p_4D7B08) + 0x2A0);
+    return *reinterpret_cast<void**>(stage + 0x1AC);
+}
+
+//@witness func=0x0049025C kind=cdecl
+int nonzero_57A3A8() { return g_57A3A8 != 0; }
+
+//@witness func=0x004905B5 kind=cdecl
+int is_zero_4C8A60() { return g_4C8A60 == 0; }
 
 // ===========================================================================
 // 形态 3：只碰全局指针 + xmm 参数

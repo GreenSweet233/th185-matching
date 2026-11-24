@@ -32,6 +32,9 @@ extern unsigned g_at_4D72F4;
 extern void* g_p_kitchen;
 extern unsigned g_at_4D7820;
 extern unsigned g_at_4D7824;
+extern int g_57A3A8;
+extern int g_4C8A60;
+extern void* g_p_4D7B08;
 
 // ---------------------------------------------------------------------------
 // 形态 1：不碰 ecx —— 普通函数
@@ -67,6 +70,17 @@ void* return_addr_4D7814();
 
 /// 0x00433850（`a1 147c4d00 8b80 2cbbe600 c3`）。不碰 ecx。
 void* load_via_global();
+
+/// 0x004340F0（`a1 087b4d00 8b80 a0020000 8b80 ac010000 c3`）。不碰 ecx。
+/// 两次定偏移解引用：+0x2A0 后 +0x1AC。
+void* load_chain_4D7B08();
+
+/// 0x0049025C（`33c0 3905 a8a35700 0f95c0 c3`）。
+/// ★ 返回 int 而非 bool —— bool 会生成 `cmp [mem],0`，而原版是 `cmp [mem],eax`。
+int nonzero_57A3A8();
+
+/// 0x004905B5（`33c0 3905 608a4c00 0f94c0 c3`）。同上，int 而非 bool。
+int is_zero_4C8A60();
 
 // ---------------------------------------------------------------------------
 // 形态 3：只碰全局指针 + xmm 参数

@@ -1,6 +1,6 @@
 {
   "_comment": "AGENTS.md §11 仪表盘。人类唯一审查对象。禁止粉饰。",
-  "updated_at": "2026-11-24T20:51:14",
+  "updated_at": "2026-11-24T21:55:00",
   "phase": "bootstrap",
   "gates_implemented": {
     "G1": true,
@@ -16,11 +16,11 @@
   "perturbation_survival": null,
   "hack_count_trend": null,
   "cross_run_consensus": null,
-  "unresolved_count": 0,
+  "unresolved_count": 25,
   "coverage": {
-    "matched": 127,
+    "matched": 156,
     "total": 1675,
-    "ratio": 0.075821,
+    "ratio": 0.093134,
     "_definition": "matched functions / binary call targets（call 目标作为可枚举函数下界）"
   },
   "_null_means": "null = 该指标尚未测得（对应门槛脚本未实现）。禁止填 0 冒充「无问题」。",
@@ -28,29 +28,30 @@
     "type_conflicts": "null = 尚无定义被测得（bootstrap 期 /src 与 /include 为空）",
     "witnessless_elements": "G2 实测值。0 表示当前源码的见证声明全部命中；不表示二进制已被完全解释（见 reverse_coverage）",
     "G6": "部分能力 UNSUPPORTED（无 RTTI 名 / 无 .pdata / 无多反编译器），gates_implemented.G6 记 false",
-    "G5": "INCOMPLETE：编译器缺口（缺 MSVC 27412/31328/31332）导致两个原文要求都无法执行"
+    "G5": "INCOMPLETE：编译器缺口（缺 MSVC 27412/31328/31332）导致两个原文要求都无法执行",
+    "byte_match": "P1 口径：有源码且能被单独编译验证的函数。156 个全部进入比对，131 通过。"
   },
   "_g1_last_run": {
     "failures": 0,
-    "definitions_checked": 57
+    "definitions_checked": 86
   },
   "_g2_last_run": {
     "status": "INCOMPLETE",
     "instruction_count": 203941,
     "binary_call_targets": 1675,
-    "witness_items": 135,
-    "function_coverage": 0.075821,
-    "matched_functions": 127
+    "witness_items": 164,
+    "function_coverage": 0.093134,
+    "matched_functions": 156
   },
   "_g4_last_run": {
     "status": "PASS",
-    "files_checked": 14,
+    "files_checked": 16,
     "violations": 0,
     "clang_format_available": false
   },
   "_g3_last_run": {
     "status": "PASS",
-    "functions": 127,
+    "functions": 156,
     "failures": 0
   },
   "_g6_last_run": {
@@ -73,8 +74,56 @@
   },
   "byte_match": {
     "status": "FAIL",
-    "matched": 102,
-    "verified": 127,
-    "_note": "只覆盖能单独编译验证的函数；其余仍只有静态门槛"
+    "matched": 131,
+    "verified": 156,
+    "_note": "131/156 字节相等。25 个 DIFF 全部为已知物理不可得（19 fsincos + 5 hotpatch 序言 + 1 and [mem],0），见 ledger/unresolved.md",
+    "_diff_addresses": [
+      "0x00404B70",
+      "0x00405A70",
+      "0x00406290",
+      "0x00407E10",
+      "0x00417750",
+      "0x00417B00",
+      "0x004299D0",
+      "0x004305B0",
+      "0x00430720",
+      "0x00441580",
+      "0x00441670",
+      "0x0044CDA0",
+      "0x004587B0",
+      "0x00463DF0",
+      "0x00467150",
+      "0x0047FFE0",
+      "0x00485B20",
+      "0x00486080",
+      "0x0048F370",
+      "0x00490463",
+      "0x0049DC88",
+      "0x0049E757",
+      "0x0049E776",
+      "0x0049EB13",
+      "0x0049EBF3"
+    ]
+  },
+  "batch4": {
+    "_date": "2026-11-24",
+    "added": 29,
+    "added_passed": 29,
+    "added_failed": 0,
+    "files": [
+      "src/MoreFields.cpp",
+      "include/MoreFields.hpp",
+      "src/Misc.cpp",
+      "include/Misc.hpp"
+    ],
+    "before": {
+      "targets": 127,
+      "matched": 102
+    },
+    "after": {
+      "targets": 156,
+      "matched": 131
+    },
+    "_note": "新形状 5 类：从指针取值写入 / 数组元素写入 / 8 字节聚合整块赋值 / 全局对象整体拷贝 / 全局表索引。其余为已有形状的新实例。"
   }
 }

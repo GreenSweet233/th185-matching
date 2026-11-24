@@ -1,7 +1,7 @@
 # TH185 字节级匹配反编译 —— 现状与决策报告
 
-> 生成时间：2026-11-24（20:00 更新）
-> 仓库提交：16（th185-matching 独立后）
+> 生成时间：2026-11-24（第 4 批匹配后更新）
+> 仓库提交：见 `git log`（本文件不维护提交号，避免漂移）
 > 本文件是给人类看的**单一入口**：当前进度、已验证的事实、需要你裁决的事项。
 > 数据全部来自实跑，不含估算。
 
@@ -9,8 +9,13 @@
 
 ## 一、一句话现状
 
-**已有 80 个函数完成字节级匹配，其中 36 个经过「编译 + 逐字节比对」验证（92.3% 通过）。**
-**卡住的地方全部需要你做决定，不是技术问题。**
+**156 个函数有源码，其中 131 个通过 P1 逐字节比对（84.0%）。**
+**剩余 25 个全部是已知物理不可得，不是技术问题，也不是还没做。**
+
+> ★ 2026-11-24 第 4 批（本文件这次更新）：
+> P1 从 `102 / 127` 提升到 `131 / 156`，新增 29 个函数**全部一次通过**。
+> 25 个 DIFF 的地址集合与上一批**完全相同** —— 无新增失败、无既有匹配退化。
+> 二进制侧仍有 **1519 个函数完全没有源码**（131 / 1675 = 7.8%），这是下一阶段的主战场。
 
 ---
 
@@ -21,8 +26,8 @@
 | 门禁 | 脚本 | 状态 | 说明 |
 |---|---|---|---|
 | G1 类型一致性 | `check_types.py` | ✅ PASS | |
-| G2 二进制见证 | `check_witness.py` | ⚠️ INCOMPLETE | 覆盖率 **127 / 1675 = 7.58%** |
-| G3 结构对齐 | `check_structure.py` | ❌ **FAIL** | **46 项** token_ratio_excess（见 §3.6）|
+| G2 二进制见证 | `check_witness.py` | ⚠️ INCOMPLETE | 覆盖率 **156 / 1675 = 9.31%**（不是失败，是进度）|
+| G3 结构对齐 | `check_structure.py` | ✅ **PASS** | 0 项失败（§3.6 的 46 项已被重构消化）|
 | G4 风格 | `check_style.py` | ✅ PASS | clang-format 缺失（FORMAT_UNAVAILABLE）|
 | G5 扰动稳定 | `check_stability.py` | ⚠️ INCOMPLETE | 编译器缺口 |
 | G6 独立证据 | `check_evidence.py` | ⚠️ INCOMPLETE | 3 项物理不可得 |
@@ -32,7 +37,7 @@
 | 验证器 | 作用 | 状态 |
 |---|---|---|
 | `check_behavior.py`（G2+） | 用 unicorn 执行**原版机器码**，与 Python 独立重算比对 | ✅ **51 / 51 PASS** |
-| `check_bytes.py`（P1） | 编译源码 → 与 `.text` 逐字节比对 | ❌ **36 / 39（92.3%）** |
+| `check_bytes.py`（P1） | 编译源码 → 与 `.text` 逐字节比对 | ⚠️ **131 / 156（84.0%）**，25 个 DIFF 全部物理不可得 |
 
 **为什么加这两个**：静态门禁只能查「形式对不对」，G2+ 查「语义对不对」，P1 查「编译器产出对不对」。
 实测证明三者缺一不可 —— 有 9 个函数 G1/G2/G3/G4/G6 全过、G2+ 全过，但**字节 0% 匹配**。
@@ -90,13 +95,20 @@ comp_id = 0x10961B9
   低16位 = 0x61B9 = 25017      ← 正是 cl.exe 版本号里的 25017
 ```
 
-### 3.1b ★ 当前真实状态（20:00 实测）
+### 3.1b ★ 当前真实状态（第 4 批后实测，数字直接取自当次脚本输出）
 
 ```
-匹配函数    127 / 1675（7.58%）
-P1 字节验证  66 / 71（93.0%）
-G1 PASS | G4 PASS | G2+ PASS(51/51)
-G2 INCOMPLETE | G3 FAIL(46) | G5 INCOMPLETE | G6 INCOMPLETE
+check_bytes.py   targets : 156（由 //@witness 自动推导）
+                 结果: 131 / 156 字节相等
+check_witness.py function coverage : 9.3134% (156 / 1675)
+check_types.py   definitions checked : 86 (88 instances)  type_conflicts: 0
+check_structure.py  0 failures
+check_style.py   violations: 0  parse errors: 0
+check_behavior.py 51 PASS / 0 FAIL
+
+G1 PASS | G3 PASS | G4 PASS | G2+ PASS(51/51)
+G2 INCOMPLETE(9.31%) | G5 INCOMPLETE | G6 INCOMPLETE
+P1 131/156（25 个 DIFF 全部物理不可得）
 ```
 
 ### 3.2 五条代码生成规则（全部实测得出）
@@ -142,22 +154,25 @@ __m128 __fastcall f(void* self, void* unused_edx) {
 - 原版出现 `fsincos` 说明它**静态链接了 x87 版 CRT**
 - 但 P1 只比对单函数 `.text`、不链接 CRT → **这 19 个函数永远无法用 C++ 源码匹配**（占 1.13%）
 
-### 3.6 G3 的 46 项 FAIL 是什么
+### 3.6 G3 的 token_ratio_excess —— 已归零（2026-11-24 第 4 批）
 
-全部是 `token_ratio_excess`（token/指令比 > 4.0）。
+**当前状态：`check_structure.py` 报 `functions : 156`，0 项失败，[PASS]。**
 
-分布：
+历史的 46 项 `token_ratio_excess`（token/指令比 > 4.0）已全部消化，
+方式**不是**改门槛（V2 的扣除逻辑已按人类裁决回退），而是把源码重写成
+「struct + 成员函数」的形态 —— 编译器自动用 ecx 传 this，不再需要
+`__fastcall` 伪装和 `unused_edx` 哑参数，token 数自然下降。
 
-| 文件 | 数量 | 原因 |
-|---|---:|---|
-| `Trivial.cpp` | 约 19 | 旧 `__fastcall` 写法（含 `fsincos` 那批）|
-| `SseAccess.cpp` | 11 | `__m128 ignored` 占位参数 |
-| `FieldWriter.cpp` | 8 | `__fastcall` + 哑参数 |
-| `Misc.cpp` | 约 12 | 常量返回 / 全局访问 |
+| 文件 | 历史 FAIL 数 | 现状 | 做法 |
+|---|---:|---|---|
+| `Trivial.cpp` | 约 19 | 0 | 全部改成成员函数 / 去掉哑参数 |
+| `SseAccess.cpp` | 11 | 0 | 写入器改成成员函数；读取器用「静态成员 + __fastcall 单参」 |
+| `FieldWriter.cpp` | 8 | 0 | `void ObjFwNN::set(int)`，token 6 / 指令 6 |
+| `Misc.cpp` | 约 12 | 0 | 同上 |
 
-**已用「struct + 成员函数」解决 19 个**（`Object.cpp`），剩下 46 项待继续重构。
+第 4 批新增的 29 个函数**全部** ratio ≤ 3.00，没有触碰任何 ABI token 问题。
 
-详见 `ledger/G3-ABI-token-proposal.md`。
+详见 `ledger/G3-ABI-token-proposal.md`（该提案仍是历史记录，但触发它的问题已通过重构消失）。
 
 ---
 
@@ -231,18 +246,18 @@ ABI    : 1 token 已从统计中扣除（见 ledger/violations.md V2）
 ### 已完成
 
 ```
-提交         194
-匹配函数     80 / 1675（4.78%）
-P1 验证      36 / 39 字节完全相等（92.3%）
+匹配函数     156 / 1675（9.31%）    ← 有源码
+P1 验证      131 / 156 字节完全相等（84.0%）
+             25 个 DIFF 全部物理不可得
 门禁脚本     6 个（G1-G6）+ 2 个自加验证器（G2+ / P1）
-代码生成规则  5 条（全部实测得出）
+代码生成规则  10 条（5 条旧 + 第 4 批新增 5 条）
 ```
 
 ### 已知瓶颈
 
 | 瓶颈 | 性质 | 需要什么 |
 |---|---|---|
-| G2 覆盖率 4.78% | **进度问题，不是阻塞** | 继续时间投入 |
+| G2 覆盖率 9.31% | **进度问题，不是阻塞** | 继续时间投入（还有 1519 个函数没源码）|
 | G5 INCOMPLETE | 编译器缺口 | 需要更完整的 CRT/toolset |
 | G6 三项 UNSUPPORTED | **物理不可得** | `/GR-` 无 RTTI、PE32 无 `.pdata`、无第二个反汇编器 |
 | V2 | **需人类裁决** | 见裁决 1 |

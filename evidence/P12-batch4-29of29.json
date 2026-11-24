@@ -1,0 +1,223 @@
+{
+  "id": "P12-batch4-29of29",
+  "date": "2026-11-24",
+  "gate": "P1 byte-level match",
+  "summary": {
+    "before": {
+      "targets": 127,
+      "matched": 102,
+      "diff": 25
+    },
+    "after": {
+      "targets": 156,
+      "matched": 131,
+      "diff": 25
+    },
+    "added": 29,
+    "added_passed": 29,
+    "added_failed": 0,
+    "regression": false,
+    "_note": "25 个 DIFF 的地址集合前后完全一致 —— 无新增失败、无既有匹配退化。"
+  },
+  "method": {
+    "discovery": "对 1675 个直接 call 目标做两轮形状聚类：(a) 指令字节序列精确分组（1619 个不同形状）；(b) mnemonic+op_str 归一化（数字掩成 #）后的结构族分组（1355 族，其中 233 个函数属于 >=2 的族）。",
+    "selection": "只取「已有形状族的新实例」或极简单的新形状；每个候选先用 tools/check_bytes.py 的 compile_cpp + bytes_match_with_relocs 做单点快跑，通过后才写入 src/。",
+    "verification": "最终数字全部来自 `python tools/check_bytes.py` 的输出，未手工推算。"
+  },
+  "new_functions": [
+    {
+      "va": "0x004408D0",
+      "bytes": "558bec8b45088941405dc20400",
+      "shape": "field writer (framed)",
+      "field": "+0x40"
+    },
+    {
+      "va": "0x00440B90",
+      "bytes": "558bec8b45088941505dc20400",
+      "shape": "field writer (framed)",
+      "field": "+0x50"
+    },
+    {
+      "va": "0x004410C0",
+      "bytes": "558bec8b45088941245dc20400",
+      "shape": "field writer (framed)",
+      "field": "+0x24"
+    },
+    {
+      "va": "0x00429A20",
+      "bytes": "558bec8b4508f30f7e00660fd641348b400889413c5dc20400",
+      "shape": "12-byte aggregate copy",
+      "field": "+0x34/+0x3C"
+    },
+    {
+      "va": "0x00434250",
+      "bytes": "558bec8b4508f30f7e00660fd681a40700008b40088981ac0700005dc20400",
+      "shape": "12-byte aggregate copy",
+      "field": "+0x7A4/+0x7AC"
+    },
+    {
+      "va": "0x00440BA0",
+      "bytes": "558bec8b4508f30f7e00660fd641308b40088941385dc20400",
+      "shape": "12-byte aggregate copy",
+      "field": "+0x30/+0x38"
+    },
+    {
+      "va": "0x00440BC0",
+      "bytes": "558bec8b4508f30f7e00660fd641248b400889412c5dc20400",
+      "shape": "12-byte aggregate copy",
+      "field": "+0x24/+0x2C"
+    },
+    {
+      "va": "0x00440BE0",
+      "bytes": "558bec8b4508f30f7e00660fd641188b40088941205dc20400",
+      "shape": "12-byte aggregate copy",
+      "field": "+0x18/+0x20"
+    },
+    {
+      "va": "0x00440C00",
+      "bytes": "558bec8b4508f30f7e00660fd6410c8b40088941145dc20400",
+      "shape": "12-byte aggregate copy",
+      "field": "+0x0C/+0x14"
+    },
+    {
+      "va": "0x004280A0",
+      "bytes": "558bec8b45088b008941045dc20400",
+      "shape": "store through pointer (NEW)",
+      "field": "+0x04"
+    },
+    {
+      "va": "0x004280B0",
+      "bytes": "558bec8b45088b0089015dc20400",
+      "shape": "store through pointer (NEW)",
+      "field": "+0x00"
+    },
+    {
+      "va": "0x00430590",
+      "bytes": "558bec8b45088b0089410c5dc20400",
+      "shape": "store through pointer (NEW)",
+      "field": "+0x0C"
+    },
+    {
+      "va": "0x004305A0",
+      "bytes": "558bec8b45088b008941085dc20400",
+      "shape": "store through pointer (NEW)",
+      "field": "+0x08"
+    },
+    {
+      "va": "0x00433BE0",
+      "bytes": "558bec8b45088b550c895481545dc20800",
+      "shape": "array element store (NEW)",
+      "field": "[+0x54] indexed"
+    },
+    {
+      "va": "0x00431270",
+      "bytes": "8b490833c080e13080f9200f94c0c3",
+      "shape": "masked equality (int)",
+      "field": "+0x08 & 0x30 == 0x20"
+    },
+    {
+      "va": "0x00441630",
+      "bytes": "8b494033c080e10f80f9020f94c0c3",
+      "shape": "masked equality (int)",
+      "field": "+0x40 & 0x0F == 0x02"
+    },
+    {
+      "va": "0x004410D0",
+      "bytes": "8b412083f80f7d0440894120c3",
+      "shape": "bounded increment",
+      "field": "+0x20 max 15"
+    },
+    {
+      "va": "0x00433B70",
+      "bytes": "558bec8b411833450883e0013141185dc20400",
+      "shape": "low-bit merge",
+      "field": "+0x18"
+    },
+    {
+      "va": "0x00441220",
+      "bytes": "558bec8b45080181dc0000005dc20400",
+      "shape": "field add",
+      "field": "+0xDC"
+    },
+    {
+      "va": "0x00441230",
+      "bytes": "558bec8b45080181d80000005dc20400",
+      "shape": "field add",
+      "field": "+0xD8"
+    },
+    {
+      "va": "0x00433C60",
+      "bytes": "f30f1189c4000000f30f1191c8000000c3",
+      "shape": "SSE double store",
+      "field": "+0xC4/+0xC8"
+    },
+    {
+      "va": "0x0049C51C",
+      "bytes": "8b41086683382a750a83c002c6411801894108c3",
+      "shape": "UTF-16 scan + flag",
+      "field": "+0x08 ptr, +0x18 flag"
+    },
+    {
+      "va": "0x004408B0",
+      "bytes": "558bec8b45088b108b400489118941045dc20400",
+      "shape": "8-byte aggregate block assign (NEW)",
+      "field": "+0x00"
+    },
+    {
+      "va": "0x00440850",
+      "bytes": "a1983e57008b159c3e570089411889511cc20400",
+      "shape": "global aggregate copy (NEW)",
+      "field": "+0x18"
+    },
+    {
+      "va": "0x00440870",
+      "bytes": "a1983e57008b159c3e5700894110895114c20400",
+      "shape": "global aggregate copy (NEW)",
+      "field": "+0x10"
+    },
+    {
+      "va": "0x0048AEC0",
+      "bytes": "8b491ca1889e52008b84882c071203c3",
+      "shape": "global table index (NEW)",
+      "field": "+0x1C as index, disp32=0x0312072C"
+    },
+    {
+      "va": "0x0049025C",
+      "bytes": "33c03905a8a357000f95c0c3",
+      "shape": "global nonzero (int)",
+      "field": "global 0x57A3A8"
+    },
+    {
+      "va": "0x004905B5",
+      "bytes": "33c03905608a4c000f94c0c3",
+      "shape": "global is-zero (int)",
+      "field": "global 0x4C8A60"
+    },
+    {
+      "va": "0x004340F0",
+      "bytes": "a1087b4d008b80a00200008b80ac010000c3",
+      "shape": "global deref chain",
+      "field": "global 0x4D7B08 -> +0x2A0 -> +0x1AC"
+    }
+  ],
+  "rules_learned": [
+    "C++ 形参必须写成 `const int*`（而不是 `int`）才会生成 `mov eax,[eax]`：这是「store through pointer」与「field writer」的唯一区别。",
+    "`f_00 = *source` 整体赋值生成 `8b10 / 8b4004`（eax/edx 双寄存器）；写 `f0=s[0]; f1=s[1];` 会改用 edx 当源指针（`8b5508/8b02`），字节不符。实测两版对比。",
+    "把全局写成 `Pair32` 对象再整体拷贝给字段，才会生成 `a1 ... / 8b15 ... / 8941N / 8951N` 的定序；逐字段赋值生成两条独立的 `a1` 交错。",
+    "位翻转必须写成 `f = (f & ~1u) | (arg & 1u)`；写成 if/else 会生成 cmov 序列（`8bd6 83ce01 83e0fe 80e201 0f44f0`）。",
+    "返回 `int` 而不是 `bool`，才生成 `xor eax,eax` + `cmp [mem],eax` + `sete/setne al`。"
+  ],
+  "toolchain_notes": {
+    "check_bytes_limitation": "check_bytes.py 只从 hpp 里提取 `constexpr`/`static const` 与 `extern ...;` 行作为前置声明（prefix）。因此被 extern 引用的类型（Pair32）必须定义在全局作用域，且不能把 `///` 文档注释挂在 extern 行前面（strip 判断是 `startswith(\"extern \")`，注释行会让提取失效 —— 本批踩过，已改为注释另起一行）。",
+    "no_tool_changes": "本批未修改任何 tools/ 下的文件。"
+  },
+  "gates_after": {
+    "G1": "PASS (86 definitions, 0 conflicts)",
+    "G3": "PASS (0 failures)",
+    "G4": "PASS (0 violations, 0 parse errors; clang-format UNAVAILABLE)",
+    "G2+": "PASS (51/51)",
+    "G2": "INCOMPLETE 9.3134% (156/1675)",
+    "G5": "INCOMPLETE",
+    "G6": "INCOMPLETE"
+  }
+}
