@@ -1,31 +1,31 @@
 # TH185 已匹配函数清单（按类别）
 
-> 更新于 2026-11-24（第 6 批批量匹配后）· 数据来源：`tools/check_bytes.py` 当次输出 + 二进制实测
+> 更新于 2026-11-24（第 7 批批量匹配后）· 数据来源：`tools/check_bytes.py` 当次输出 + 二进制实测
 >
-> **本文件的每个地址只出现一次。** 各分类之和 = 194，与 `check_bytes.py` 的 `targets` 数量**精确相等**。
+> **本文件的每个地址只出现一次。** 各分类之和 = 203，与 `check_bytes.py` 的 `targets` 数量**精确相等**。
 
 ## 真实数字（`tools/check_bytes.py` 原始输出）
 
 ```
-targets : 194（由 //@witness 自动推导）
-结果: 169 / 194 字节相等
+targets : 203（由 //@witness 自动推导）
+结果: 178 / 203 字节相等
 ```
 
 | 项 | 数量 |
 |---|---:|
-| 有源码的函数（`//@witness` 自动推导的 targets） | **194** |
-| P1 逐字节通过 | **169** |
+| 有源码的函数（`//@witness` 自动推导的 targets） | **203** |
+| P1 逐字节通过 | **178** |
 | P1 未通过 | **25**（全部已知物理不可得，见末节） |
 | 二进制可枚举函数总数（G2 口径：直接 call 目标） | 1675 |
-| 覆盖率（194 / 1675） | **11.58%** |
+| 覆盖率（203 / 1675） | **12.12%** |
 
-> 第 6 批新增 **17** 个函数（`src/Batch6.cpp`），**全部通过**。
-> 25 个 DIFF 的地址集合与第 5 批**完全相同** --- 无新增失败、无既有匹配退化。
-> P1 从 `152 / 177`（85.9%）提升到 `169 / 194`（87.1%）。
+> 第 7 批新增 **9** 个函数（`src/Batch7.cpp`），**全部通过**。
+> 25 个 DIFF 的地址集合与第 5/6 批**完全相同** --- 无新增失败、无既有匹配退化。
+> P1 从 `169 / 194`（87.1%）提升到 `178 / 203`（87.7%）。
 
 ## 类别总览
 
-> 本表的分类是**从二进制机器码自动推导**的（判据见每节标题），不是手工归类。
+> 本表的分类是**从二进制机器码自动推导**的，不是手工归类。
 
 | 类 | 名称 | 数量 | P1 通过 | P1 失败 |
 |---|---|---:|---:|---:|
@@ -38,74 +38,58 @@ targets : 194（由 //@witness 自动推导）
 | H | 字段读取器 / 返回常量 | **51** | 51 | 0 |
 | I | 字段地址取用（返回指针） | **6** | 6 | 0 |
 | J | 带栈帧的简单写入器 | **22** | 22 | 0 |
-| K | 含 call 的函数 | **14** | 14 | 0 |
+| K | 含 call 的函数 | **23** | 23 | 0 |
 | Z | 其他 --- 未通过 | **1** | 0 | 1 |
 | E | 指针编码（`8bff` 序言）--- 全部未通过 | **5** | 0 | 5 |
 | F | `fsincos` 极坐标 --- 全部未通过 | **19** | 0 | 19 |
-| | **合计** | **194** | **169** | **25** |
+| | **合计** | **203** | **178** | **25** |
 
 ---
 
-## 第 6 批新增的 17 个函数（全部 P1 MATCH）
+## 第 7 批新增的 9 个函数（全部 P1 MATCH）
 
-源码 `src/Batch6.cpp`，结构体 `include/Batch6.hpp`。
+源码 `src/Batch7.cpp`，结构体 `include/Batch7.hpp`。
 
 | 地址 | 类 | 字节 | 函数 |
 |---|---|---:|---|
-| `0x0041C7B0` | G | 37 | `InputMaskQuery::any_of_first_pair` |
-| `0x00431570` | G | 37 | `InputMaskQueryAlternate::any_of_second_pair` |
-| `0x0048AE00` | C1 | 44 | `ResourceProbe44::read` |
-| `0x0048AE30` | C1 | 44 | `ResourceProbe54::read` |
-| `0x0048AE60` | C1 | 44 | `ResourceProbe58::read` |
-| `0x00409C40` | G | 94 | `CounterB4::advance_capped` |
-| `0x00417940` | G | 97 | `Counter9C::advance_capped` |
-| `0x004306A0` | G | 97 | `CounterAC::advance_capped` |
-| `0x004410F0` | G | 97 | `CounterA4::advance_capped` |
-| `0x00447D80` | G | 97 | `CounterA8::advance_capped` |
-| `0x00447DF0` | G | 97 | `CounterA0::advance_capped` |
-| `0x00447E60` | G | 94 | `Counter90::advance_capped` |
-| `0x00447EC0` | G | 94 | `Counter98::advance_capped` |
-| `0x00447F20` | G | 97 | `Counter94::advance_capped` |
-| `0x00447F90` | G | 97 | `Counter8C::advance_capped` |
-| `0x00448000` | G | 97 | `Counter88::advance_capped` |
-| `0x00463D90` | G | 94 | `CounterB0::advance_capped` |
+| `0x0042A1E0` | K | 17 | `SingletonGuard4D7AE0::release_if_present` |
+| `0x00432600` | K | 17 | `SingletonGuard4D7AF0::release_if_present` |
+| `0x00434C30` | K | 17 | `SingletonGuard4D7AF4::release_if_present` |
+| `0x00442630` | K | 17 | `SingletonGuard4D7B08::release_if_present` |
+| `0x0044BA20` | K | 17 | `SingletonGuard4D7C14::release_if_present` |
+| `0x00469AF0` | K | 17 | `SingletonGuard4D7C4C::release_if_present` |
+| `0x0041C6B0` | K | 39 | `DispatchModeTwo::apply` |
+| `0x0041C6E0` | K | 39 | `DispatchModeThree::apply` |
+| `0x004480A0` | K | 39 | `DispatchModeFour::apply` |
 
-### 三类形状
+### 两类形状
 
 | 形状族 | 数量 | 说明 |
 |---|---:|---|
-| 分桶计数推进器 `advance_capped` | 12 | 上限钳制 + 负数归零 + 满 100 进一 |
-| 全局掩码查询 `any_of_*_pair` | 2 | 两个全局掩码量的 OR |
-| 资源浮点查询 `read` | 3 | find 命中读 +0x44/+0x54/+0x58，未命中读兜底 |
+| 全局单例析构守卫 `release_if_present` | 6 | 全局指针非空则调用析构（17 字节）|
+| 虚表槽位分派 `apply` | 3 | 索引查表后间接调用，第二实参走 edx（39 字节）|
 
-### 本批新确立 / 复用的代码生成规则
+### 本批新确立的代码生成规则
 
-1. **`constexpr` 常量不能放 hpp --- 若该 hpp 里有成员函数，会 C2374 重定义。**
-   `check_bytes.py` 拼翻译单元时对成员函数会做两件事：
-   (a) 把 hpp 里所有 `constexpr` / `static const` 行抽进 prefix；
-   (b) 又把整个 hpp 的声明行拼进去。常量因此出现两次。
-   非成员函数只走 (a)，所以历史文件的 hpp 常量一直没暴露这个问题。
-   **修法**：常量放进 `.cpp` 的匿名 `namespace { ... }`（只被抽一次）。
-2. **hpp 里的 `struct` 必须放在 `namespace th185` 内，`extern` 全局量必须放在 namespace 外。**
-   `check_bytes.py` 用 `hpp_namespace_chain()` 把 `.cpp` 的函数定义包回 hpp 的 namespace；
-   若 struct 在全局而定义在 `th185` 里，clang 视为两个不同类型，G4 报
-   `cannot define or redeclare ... because namespace 'th185'`。
-   本批第一次 G4 FAIL 就是这一条。
-3. **返回 `int` 与 `bool` 走不同路径**（STATUS.md 3.2 规则 3 复用）：
-   掩码查询写 `bool` 得 `b001`/`32c0`，写 `int` 才是原版的 `b801000000`/`33c0`。
-4. **返回 `__m128` 而非 `float`；且必须「静态成员 + `__fastcall` 单参」**（STATUS.md 3.3 复用）：
-   `float` 走 x87 `fld`；普通成员函数返回 `__m128` 走 sret（隐藏返回指针）。
-5. **绝对地址操作数（`test dword [0x4CE400],eax`）的见证类型是 `disp` 而不是 `imm`。**
-   方括号内的位移与方括号外的立即数在 `check_witness.py` 里分属两个集合，
-   写错会导致 G2 `witness_not_found`。本批第一次 G2 FAIL 就是这一条（4 处）。
-6. **「赋值表达式作返回值」与「先算 `int next` 再赋值返回」生成同样字节**：
-   两种写法实测都是 `lea eax,[edi+1] / cmp ecx,0x63 / cmovne eax,edi / mov [esi+OFF],eax`。
-   说明这是 `/O2` 对该模式的稳定产物，不依赖具体写法。
+1. **全局指针守卫：被调方必须声明成「成员函数 + 显式 this 实参」，不能用 `__stdcall` 自由函数。**
+   原版 `mov ecx,[g] / test ecx,ecx / je / push ecx / call / ret`：
+   全局量用 **ecx** 装载（说明当 this 用），但 **push ecx** 又把它压栈（说明 this 也进实参）。
+   写成 `__stdcall` 自由函数会得到 `a1 <mem>`（mov eax,moffs），
+   因为 MSVC 对「无 this 的指针全局」用 eax 装载。长度 16 vs 17，差 1 字节。
+   正确写法：`struct Destructible { void destroy(Destructible* self); };` 然后 `p->destroy(p)`。
+2. **`void*` 转成有成员函数的类指针必须用 `reinterpret_cast`，不能 `static_cast`。**
+   `static_cast<Destructible*>(p)` 报 C2664（`void*` 无法隐式转 `Destructible*`）。
+   本批 6 个守卫第一次全部 COMPILE_ERROR 就是这一条。
+3. **间接调用的函数指针类型必须显式带 `__fastcall`。**
+   原版 `mov edx,imm32 / call eax` 说明第二实参走 edx。
+   写成 `void (*handler)(void*, int)` 会退化成 cdecl，生成 `6a02 / push / call / add esp,8`（40 字节）。
+   必须写 `void (__fastcall* handler)(void*, int)`，才得到 `ba02000000 / ffd0`（39 字节）。
+4. **`Destructible` 这种被成员函数体引用的辅助类型必须放全局作用域**（放 `namespace th185` 内会 C2061）。
+5. **`constexpr` 常量仍然必须放 `.cpp` 的匿名 namespace**（第 6 批结论复用，本批再次验证）。
 
 ### 本批的负面结果（不写入 src/）
 
 **441 个无源码函数带 `8bff`（`mov edi,edi`）前缀，v142 无法生成。**
-本批对全部 1498 个无源码函数做了前缀统计：
 
 | 范围 | 总数 | 带 `8bff` | 可匹配池 |
 |---|---:|---:|---:|
@@ -114,8 +98,15 @@ targets : 194（由 //@witness 自动推导）
 | 13-30 且无分支 | 116 | 47 (40.5%) | 69 |
 
 实测 9 种 flags 组合（`/O1 /O2 /Od` x `/Oy-` x `/hotpatch` x `/Gy` x `/Zi`）：
-`/hotpatch` 一律生成 `6690`，**`8bff` 命中 0 次**。与第 4/5 批登记的 E 类结论一致。
+`/hotpatch` 一律生成 `6690`，**`8bff` 命中 0 次**。与第 4/5/6 批的 E 类结论一致。
 **这些函数不写入 `src/`**（宁可 unmatched，不可 garbage match）。
+
+另有两个同族但**未匹配**的候选，如实登记：
+
+| 地址 | 形状 | 未匹配原因 |
+|---|---|---|
+| `0x00404B90 0x00404BB0 0x0045C9C0` | `push ebp / and esp,-8 / cvtss2sd xmm0,xmm0 / call CRT / cvtsd2ss / ret` | 形参从 **xmm0** 读（不是 `[ebp+8]`），说明签名是 `__m128 f(__m128)`；但 v142 对 `__m128` 返回值总会多出 `xorps` 等 20+ 字节准备代码，试了 9 种数学函数 x 5 种写法，长度都对不上（20/29/30 vs 23）|
+| `0x0041C9D0` 等 7 个 | 惰性初始化设置器（`test dl,1 / jne / or edx,1 / 两次清零`）| 原版把 `edx` 单独装载后再 `test dl,1`，而 v142 对任何等价 C++ 写法都生成 `test al,1`（用 eax）；长度 86 vs 75。试了 8 种语句顺序 + 4 种标志类型（`unsigned`/`bool`/位域/`unsigned char`）|
 
 ---
 
@@ -337,13 +328,22 @@ targets : 194（由 //@witness 自动推导）
 
 ---
 
-## K. 含 call 的函数（14 个）
+## K. 含 call 的函数（23 个）
 
 | 地址 | 状态 | 字节 | 机器码 | 源文件 |
 |---|---|---:|---|---|
+| `0x0041C6B0` | OK | 39 | `568bf18b86e005000085c0740e8b0485f85c4b00ba02000000ffd0c78694040000020000005ec3` | Batch7.cpp |
+| `0x0041C6E0` | OK | 39 | `568bf18b86e005000085c0740e8b0485f85c4b00ba03000000ffd0c78694040000030000005ec3` | Batch7.cpp |
 | `0x00429BF0` | OK | 23 | `5668600400008bf16a0056e86077060083c40c8bc65ec3` | MoreFields2.cpp |
+| `0x0042A1E0` | OK | 17 | `8b0de07a4d0085c9740651e8c0feffffc3` | Batch7.cpp |
+| `0x00432600` | OK | 17 | `8b0df07a4d0085c9740651e830feffffc3` | Batch7.cpp |
 | `0x00434200` | OK | 23 | `5668600400008bf16a0056e850d1050083c40c8bc65ec3` | MoreFields2.cpp |
 | `0x00434280` | OK | 23 | `56685c0400008bf16a0056e8d0d0050083c40c8bc65ec3` | MoreFields2.cpp |
+| `0x00434C30` | OK | 17 | `8b0df47a4d0085c9740651e860feffffc3` | Batch7.cpp |
+| `0x00442630` | OK | 17 | `8b0d087b4d0085c9740651e820feffffc3` | Batch7.cpp |
+| `0x004480A0` | OK | 39 | `568bf18b86e005000085c0740e8b0485f85c4b00ba04000000ffd0c78694040000040000005ec3` | Batch7.cpp |
+| `0x0044BA20` | OK | 17 | `8b0d147c4d0085c9740651e890feffffc3` | Batch7.cpp |
+| `0x00469AF0` | OK | 17 | `8b0d4c7c4d0085c9740651e820ffffffc3` | Batch7.cpp |
 | `0x0048F711` | OK | 14 | `558becff7508e863090000595dc3` | FieldAccess.cpp |
 | `0x0049DEDF` | OK | 15 | `6a016a026a00e8aafeffff83c40cc3` | MoreFields2.cpp |
 | `0x0049DEEE` | OK | 15 | `6a016a006a00e89bfeffff83c40cc3` | MoreFields2.cpp |
@@ -416,7 +416,7 @@ targets : 194（由 //@witness 自动推导）
 
 ## 验证覆盖率的真实情况
 
-- `check_bytes.py`（P1）：**169 / 194**，25 个 DIFF 全部物理不可得。
+- `check_bytes.py`（P1）：**178 / 203**，25 个 DIFF 全部物理不可得。
 - `check_behavior.py`（G2+）：51 / 51 PASS（用 unicorn 执行**原版机器码**，与 Python 独立重算比对）。
 - 注意：**这两个数字不同量纲** --- G2+ 只证明语义，P1 才证明字节。
 
