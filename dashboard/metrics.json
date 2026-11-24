@@ -1,6 +1,6 @@
 {
   "_comment": "AGENTS.md §11 仪表盘。人类唯一审查对象。禁止粉饰。",
-  "updated_at": "2026-11-24T14:39:12",
+  "updated_at": "2026-11-25T00:53:12",
   "phase": "bootstrap",
   "gates_implemented": {
     "G1": true,
@@ -18,9 +18,9 @@
   "cross_run_consensus": null,
   "unresolved_count": 25,
   "coverage": {
-    "matched": 177,
+    "matched": 203,
     "total": 1675,
-    "ratio": 0.105672,
+    "ratio": 0.121194,
     "_definition": "matched functions / binary call targets（call 目标作为可枚举函数下界）"
   },
   "_null_means": "null = 该指标尚未测得（对应门槛脚本未实现）。禁止填 0 冒充「无问题」。",
@@ -33,25 +33,25 @@
   },
   "_g1_last_run": {
     "failures": 0,
-    "definitions_checked": 95
+    "definitions_checked": 127
   },
   "_g2_last_run": {
     "status": "INCOMPLETE",
     "instruction_count": 203941,
     "binary_call_targets": 1675,
-    "witness_items": 185,
-    "function_coverage": 0.105672,
-    "matched_functions": 177
+    "witness_items": 272,
+    "function_coverage": 0.121194,
+    "matched_functions": 203
   },
   "_g4_last_run": {
     "status": "PASS",
-    "files_checked": 18,
+    "files_checked": 22,
     "violations": 0,
     "clang_format_available": false
   },
   "_g3_last_run": {
     "status": "PASS",
-    "functions": 177,
+    "functions": 203,
     "failures": 0
   },
   "_g6_last_run": {
@@ -61,7 +61,7 @@
   },
   "_g5_last_run": {
     "status": "INCOMPLETE",
-    "files_probed": 7,
+    "files_probed": 11,
     "not_executed": 2,
     "blockers": 1
   },
@@ -74,36 +74,9 @@
   },
   "byte_match": {
     "status": "FAIL",
-    "matched": 152,
-    "verified": 177,
-    "_note": "152/177 字节相等。25 个 DIFF 全部为已知物理不可得（19 fsincos + 5 hotpatch 序言 + 1 and [mem],0）",
-    "_diff_addresses": [
-      "0x00404B70",
-      "0x00405A70",
-      "0x00406290",
-      "0x00407E10",
-      "0x00417750",
-      "0x00417B00",
-      "0x004299D0",
-      "0x004305B0",
-      "0x00430720",
-      "0x00441580",
-      "0x00441670",
-      "0x0044CDA0",
-      "0x004587B0",
-      "0x00463DF0",
-      "0x00467150",
-      "0x0047FFE0",
-      "0x00485B20",
-      "0x00486080",
-      "0x0048F370",
-      "0x00490463",
-      "0x0049DC88",
-      "0x0049E757",
-      "0x0049E776",
-      "0x0049EB13",
-      "0x0049EBF3"
-    ]
+    "matched": 178,
+    "verified": 203,
+    "_note": "只覆盖能单独编译验证的函数；其余仍只有静态门槛"
   },
   "batch4": {
     "_date": "2026-11-24",
