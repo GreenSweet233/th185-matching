@@ -248,6 +248,23 @@ def main():
         ("0x00441210", 0x00441210, "FieldAccess.cpp", "get_field_3C", True),
         ("0x00433DD0", 0x00433DD0, "FieldAccess.cpp", "addr_of_4FF4", True),
         ("0x00433DF0", 0x00433DF0, "FieldAccess.cpp", "addr_of_1230", True),
+        ("0x00429A40", 0x00429A40, "SseAccess.cpp", "load_18", True),
+        ("0x00441240", 0x00441240, "SseAccess.cpp", "load_28", True),
+        ("0x00441250", 0x00441250, "SseAccess.cpp", "load_2C", True),
+        ("0x00441330", 0x00441330, "SseAccess.cpp", "load_20", True),
+        ("0x00441340", 0x00441340, "SseAccess.cpp", "load_24", True),
+        ("0x00441600", 0x00441600, "SseAccess.cpp", "load_04", True),
+        ("0x004415F0", 0x004415F0, "SseAccess.cpp", "store_00", True),
+        ("0x004415E0", 0x004415E0, "SseAccess.cpp", "store_04", True),
+        ("0x00417780", 0x00417780, "SseAccess.cpp", "store_18", True),
+        ("0x004299F0", 0x004299F0, "SseAccess.cpp", "store_24", True),
+        ("0x00429A00", 0x00429A00, "SseAccess.cpp", "store_20", True),
+        ("0x00441270", 0x00441270, "SseAccess.cpp", "store_2C", True),
+        ("0x00441320", 0x00441320, "SseAccess.cpp", "store_34", True),
+        ("0x00441310", 0x00441310, "SseAccess.cpp", "store_38", True),
+        ("0x004341D0", 0x004341D0, "SseAccess.cpp", "store_6C", True),
+        ("0x004341E0", 0x004341E0, "SseAccess.cpp", "store_74", True),
+        ("0x004341F0", 0x004341F0, "SseAccess.cpp", "store_78", True),
     ]
 
     for label, va, src_name, fn_name, need_this, *rest in targets:
@@ -360,6 +377,21 @@ def main():
         # 折中：只保留 <...> 形式的系统头。
         sys_includes = [ln for ln in lines
                         if ln.strip().startswith("#include <")]
+
+        # ★ 2026-11-24 补：工程头里的系统 include 也要带进来
+        #
+        # 例子：SseAccess.cpp 只 `#include "SseAccess.hpp"`，
+        # 而 `<xmmintrin.h>` 在那个 .hpp 里。若只扫 .cpp，
+        # `_mm_load_ss` 就找不到声明，整批函数全失败。
+        hpp_for_inc = os.path.join(
+            root, "include", src_name.replace(".cpp", ".hpp"))
+        if os.path.isfile(hpp_for_inc):
+            with open(hpp_for_inc, encoding="utf-8") as fh:
+                for ln in fh.read().split("\n"):
+                    s2 = ln.strip()
+                    if s2.startswith("#include <") and ln not in sys_includes:
+                        sys_includes.append(ln)
+
         if sys_includes:
             body = "\n".join(sys_includes) + "\n" + body
 
