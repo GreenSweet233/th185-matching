@@ -1,0 +1,147 @@
+{
+  "_comment": "★ 借用本机 th16 matching repo 的工具链与方法论。找到 MSVC v141 并实测了 encode_value / fsincos。",
+  "date": "2026-11-24",
+  "source": {
+    "repo": "thvip/th16（本地克隆自 https://github.com/johnthreekay/th16，用户 GreenSweet233 有 fork）",
+    "why_relevant": "TH16 与 TH185 同属小数点作世代，引擎延续性强（ZUN 的 ECL/ANM/PBG4/RNG 架构一脉相承）",
+    "th16_achievement": {
+      "functions": "1004 / 1199 字节级一致（83.74%）",
+      "vtables": "26 / 26",
+      "globals": "201 / 202",
+      "behavior": "20 局 replay、11828 帧逐帧零差异",
+      "toolchain": "MSVC 14.10.25017 (VS2017 15.0) + Windows 7.1A SDK + UCRT 10.0.10240.0 + DirectX SDK (June 2010)"
+    }
+  },
+  "key_borrowing_1_toolchain": {
+    "finding": "本机 th16/prefix/ 里已有完整 MSVC v141 工具链",
+    "path": "D:\\Windows\\GreenSweet\\Game\\Tasks\\thvip\\th16\\prefix",
+    "components": {
+      "msvc": "prefix/vs/VC/Tools/MSVC/14.10.25017（cl.exe 报 19.10.25017）",
+      "sdk": "prefix/sdk/Program Files/Microsoft SDKs/Windows/v7.1A",
+      "ucrt": "prefix/sdk/Windows Kits/10/Include/10.0.10240.0/ucrt",
+      "dxsdk": "prefix/dxsdk"
+    },
+    "include_order": [
+      "MSVC/include",
+      "Kits10/Include/10.0.10240.0/ucrt",
+      "SDK71A/Include",
+      "DXSDK/Include"
+    ],
+    "why_this_matters": "之前我一直以为「需要装 VS2017」是阻塞项。实际 th16 已经把工具链下载好放在 prefix/ 里，直接复用即可。"
+  },
+  "experiment_1_encode_value_0x0049DC88": {
+    "target": "8bff558beca14c8a4c0083e01f6a20592bc88b4508d3c833054c8a4c005dc3",
+    "v141_results": [
+      {
+        "flags": "/O1 /GS- /Oy- /hotpatch",
+        "bytes": "6690558bec8b154c8a4c008bc283e01f6a20592bc88b...",
+        "size": 30,
+        "verdict": "有 6690（不是 8bff）+ 8b15（不是 a1）+ 6a2059 ✅"
+      },
+      {
+        "flags": "/O2 /GS- /Oy- /hotpatch",
+        "bytes": "6690558bec8b154c8a4c00b9200000008bc283e01f2b...",
+        "size": 32,
+        "verdict": "有 b920000000 而非 6a2059"
+      },
+      {
+        "flags": "/Os /GS- /Oy- /hotpatch",
+        "bytes": "6690558bec5151a14c8a4c008945f88b45f883e01f6a...",
+        "size": 57,
+        "verdict": "有 a1 但栈帧太大"
+      },
+      {
+        "flags": "/Ox /GS- /Oy- /hotpatch",
+        "bytes": "6690558bec8b154c8a4c00b9200000008bc283e01f2b...",
+        "size": 32,
+        "verdict": "同 /O2"
+      }
+    ],
+    "conclusion": [
+      "**v141 的 /hotpatch 也生成 `66 90`，不是 `8b ff`** —— 推翻了我上一轮「更早版本用 8bff」的推测",
+      "`a1`（moffs32）只在 `/Od` 或 `/Os` 下出现，而 `/O1`/`/O2` 用 `8b15`（mov edx）",
+      "`6a2059`（push/pop）只在 `/O1` 下出现",
+      "**三个特征在两个版本下都无法同时满足**",
+      "原版 `8bff` 需要比 v141 更早的编译器（VS2015 v140 或更早）"
+    ],
+    "status": "UNRESOLVED —— 需要 VS2015 (v140) 或更早"
+  },
+  "experiment_2_fsincos_0x00404B70": {
+    "target": "558bec51894dfc8b45fcd94508d9fbd84d0cd918d84d0cd958048be55dc20800",
+    "v141_results": "测试了 /O2 /Od /Os /O1 + extern 声明，全部未生成 fsincos(d9fb)",
+    "conclusion": "与 v142 一致 —— MSVC 编译器前端在任何版本都不合成 fsincos。这是 CRT 内部实现，不是编译器内联产物。",
+    "status": "CONFIRMED IMPOSSIBLE —— 该结论不变"
+  },
+  "key_borrowing_2_methodology": {
+    "th16_findings_doc": "th16/docs/findings.md（1906 行，记录了所有「决定 MSVC 输出」的源码形态规律）",
+    "most_valuable_patterns": [
+      "**LTCG 整程序优化**：TH16 用 /GL + /LTCG，一个函数的匹配会影响另一个。参数在所有调用点都是常量时会被折叠但保留栈槽，调用方用 push ecx 填充",
+      "**UCRT 内联函数**（vsprintf/cosf/fabsf）在 SDK 头里是 inline，会在 /GL 下作为游戏一部分编译，得到与 ZUN 代码相同的 LTCG 约定",
+      "**volatile 技巧**：create_func 的每个构造赋值都被保留然后覆盖，唯一能复现的写法是通过 volatile UpdateFunc* 写入",
+      "**RTTI 名字必须用 ZUN 的**：ThreadInf / EnemyInf 等，因为 exe 里存着这些名字",
+      "**跳转表 switch 的 case 块按源码顺序布局** —— 可以反推 ZUN 的 case 顺序",
+      "**`new T` 与 `new T()` 不同**：后者值初始化加 memset。ZUN 写 `new T`",
+      "**DECOMP_NOINLINE**：可以让某个 UCRT 内联函数在整程序范围保持 out-of-line",
+      "**`#pragma loop(no_vector)`**：复现原版未向量化的循环"
+    ],
+    "th16_diff_categories": [
+      "① 编译器常量折叠（如 mulss xmm1,[__real@3f800000] 乘 1.0f 被折叠掉）",
+      "② 栈帧与 /GS cookie 槽位（由局部变量集合整体决定，调声明顺序/volatile 均无效）",
+      "③ 寄存器分配与公共子表达式合并（属于分配器决策，无法指定）"
+    ],
+    "th16_key_insight": "**后两类是整程序决策，修好一个函数可能让另一个失配，有些可能永远无法匹配。** 这与我们目前遇到的 fsincos / hotpatch 同类。"
+  },
+  "key_borrowing_3_tool_inventory": {
+    "scripts_worth_porting": [
+      {
+        "name": "variants_search.py",
+        "purpose": "自动尝试多种源码写法找匹配",
+        "potential": "可直接用于我们的批量匹配"
+      },
+      {
+        "name": "quickdiff.py",
+        "purpose": "秒级差分（globals 按符号+偏移比对）",
+        "potential": "比我们的 check_bytes 快得多"
+      },
+      {
+        "name": "gap_report.py",
+        "purpose": "生成所有未匹配函数的差异分类报告",
+        "potential": "可用于规划下一批目标"
+      },
+      {
+        "name": "check_unchanged.py",
+        "purpose": "确认可读性修改不改变代码",
+        "potential": "对功能还原仓库更有用"
+      },
+      {
+        "name": "behavior_diff.py",
+        "purpose": "比对每个函数用到的 calls/constants/globals",
+        "potential": "我们的 G2+ 可以借鉴"
+      },
+      {
+        "name": "sigscan.py",
+        "purpose": "签名扫描找函数",
+        "potential": "可替代我们的 function_extent"
+      },
+      {
+        "name": "replay_trace_native.py",
+        "purpose": "原生 Windows 帧级追踪",
+        "potential": "TH185 无 Replay，不适用"
+      }
+    ]
+  },
+  "what_changed_in_our_understanding": [
+    "✓ 找到了 v141 工具链（不需要下载安装）",
+    "✗ 「更早版本用 8bff」的推测被推翻（v141 也用 6690）",
+    "✗ fsincos 无法生成 —— 再次确认，跨版本不变",
+    "✓ 学到了 LTCG 整程序优化的概念（TH16 用 /GL，我们的原版可能也用了）",
+    "✓ 学到了 th16 的 8 个源码形态规律（volatile / new T / case 顺序 / 跳转表布局等）"
+  ],
+  "next_actions": [
+    "① 把 v141 加入 check_bytes.py 的编译器候选",
+    "② 移植 th16 的 variants_search.py（自动写法搜索）",
+    "③ 检查 th185.exe 是否用了 /GL/LTCG（Rich Header 或 .text 特征）",
+    "④ 把 th16 的 findings 与我们的 5 条规则合并成一份「MSVC 代码生成规律」文档"
+  ],
+  "tested_at": "2026-11-24T09:04:34.561Z"
+}
