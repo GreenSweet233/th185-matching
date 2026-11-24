@@ -141,8 +141,23 @@ def norm_value(kind, value):
     """
     v = value.strip()
     if kind in ("call", "imm", "disp"):
+        # ★ 裸十六进制（无 0x 前缀）必须按 16 进制解析。
+        #
+        # 见证声明写成 `//@witness disp 4D7AE0`（不带 0x，因为地址本来就是
+        # 十六进制），旧代码走 `int(v, 0)` —— 对 "4D7AE0" 会抛 ValueError
+        # （`0` 前缀只认 0o/0x/0b，裸串被当成十进制，"D" 不是数字），
+        # 于是返回字符串 "4D7AE0"，`isinstance(val, int)` 为 False，
+        # 该 disp 见证一律 FAIL，报错还写着「not inside this function」——
+        # 看起来像二进制里没有，实际是解析失败。
+        #
+        # 判据：如果串里含 a-f 且不含 0x 前缀，它只能是十六进制。
         try:
-            return int(v, 16) if v.lower().startswith("0x") else int(v, 0)
+            if v.lower().startswith("0x"):
+                return int(v, 16)
+            try:
+                return int(v, 0)          # 十进制 / 0o / 0b
+            except ValueError:
+                return int(v, 16)         # 裸十六进制：4D7AE0
         except ValueError:
             return v
     if kind == "slot":
