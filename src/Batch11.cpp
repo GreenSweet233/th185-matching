@@ -14,25 +14,15 @@
 //   5d               pop  ebp
 //   c20400           ret  4
 //
-// ★ 必须用 `Pair 整体赋值`（`f = *s`），不能逐字段写。
-//   逐字段 `x = s[0]; y = s[1];` 生成的是：
+// ★ 必须用 `Pair2 整体赋值`（`f = *source`），不能逐字段写。
+//   逐字段 `x = s->a; y = s->b;` 生成的是：
 //     8b5508 8b02 894108 8b4204 89410c
 //              ^^^^           ^^^^^^     用 edx 作基址（mov edx,[ebp+8]）
 //   目标用的是 `8b4508`（eax 作基址），只有整体赋值才这样。
 //
+// ★ struct 定义只在 hpp 里，cpp 不能重复定义（会 G4 parse_error）。
+//
 //@witness func=0x00440890 kind=thiscall
-struct Pair2 {
-    int a;
-    int b;
-};
-
-struct ObjPair {
-    char p[8];
-    Pair2 f;
-
-    void copy_from(const Pair2* source);
-};
-
 void ObjPair::copy_from(const Pair2* source) {
     f = *source;
 }
