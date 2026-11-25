@@ -724,3 +724,69 @@ ours: 8bc8 8b80bc050000 85c0 75e8
 **目标里如果 `float` 结果落 `xmm0` 且函数是叶子，先试 `__vectorcall`。**
 
 反过来：如果试了 `/fp:fast`、`/arch:SSE*` 都还是 `fld`，那就是调用约定问题，不是浮点模型问题。
+---
+
+## U13：G4「能 for 不 while」与 P1 字节匹配的真实冲突（2026-11-25）
+
+### 现象
+
+`0x004029B0`（71 字节）和 `0x00404B10`（77 字节）是角度归一化函数。
+它们的目标控制流是：
+
+```asm
+loop1:
+8bc1          mov eax, ecx      ; old = n
+f30f5cc2      subss xmm0, xmm2  ; a -= 2PI
+41            inc ecx           ; ++n
+83f820        cmp eax, 0x20
+7f05          jg done1
+0f2fc1        comiss xmm0, xmm1
+77ef          ja loop1           ; while (a > PI)
+```
+
+这是标准的 **while 循环**（条件在末尾判断）。
+
+### 但 G4 判它 FAIL
+
+```
+[FAIL] while_should_be_for  src\Batch22.cpp:72
+       while (a > kPi) {
+       -> §6 G4 规范形：能 for 不 while（循环体在自增计数器）
+```
+
+`check_style.py` 的 `scan_while()` 判定口径：
+```python
+if re.search(r"(?:\+\+\s*\w+|\w+\s*\+\+|\w+\s*\+=\s*1)", body):
+    findings.append({... "while_should_be_for" ...})
+```
+
+**只要循环体里有 `++n` 就判 FAIL**，不看循环的具体形态。
+
+### 改成 for 后 P1 掉下来
+
+| 写法 | 长度 | P1 |
+|---|---:|---|
+| `while (a > kPi) { int old=n; a-=2PI; ++n; if(old>0x20) break; }` | **71** | **★MATCH** |
+| `for (; a > kPi; ++n) { int old=n; a-=2PI; if(old>0x20) break; }` | 73 | DIFF |
+
+**目标字节就是 while 形态，for 写法的控制流结构不一样。**
+
+### 处置
+
+**保留 while（P1 匹配），G4 如实报 FAIL。**
+
+理由：
+1. 按既有原则，**改了门禁换来的 PASS 不算 PASS**（见 V2）
+2. P1 是字节级判据，比 G4 的风格规范更硬
+3. 两者冲突时，**不能为了 G4 让 P1 掉下来** —— 那等于用风格规则否定事实
+
+### 需要人类裁决
+
+`scan_while()` 的口径可能过宽：
+
+- 它只看「循环体有自增」，但**没有区分「计数器用于循环条件」和「计数器只是副作用」**
+- 本例的 `n` 是安全上限计数器，不是循环的主控变量（主控是 `a > kPi`）
+- 真正的「能用 for」应该判据是：**计数器的自增是循环的唯一驱动**
+
+**建议（未实施）**：把判据改成「for 的三段式能等价表达该循环」才算 FAIL。
+但这属于改门槛脚本，需批准。
