@@ -181,3 +181,71 @@ G4 要求「过 clang-format」。全盘搜索本机无独立 clang-format（只
 不是阻塞，是进度：目前只重建了 1 个函数（0x00402A50），
 它的见证全部成立，但整个 .text 有 1678 个 call 目标待解释。
 覆盖率会随函数逐个匹配单调上升。
+---
+
+## U5：`fsincos` 19 个函数 —— 已穷举确认（2026-11-25 更新）
+
+### 目标字节
+
+```
+558bec51894dfc8b45fcd94508d9fbd84d0cd918d84d0cd958048be55dc20800   (ret 8, 2 参数)
+558bec51894dfc8b45fcd94508d9fbd84d0cd918d84d10d958048be55dc20c00   (ret 0xC, 3 参数)
+```
+
+反汇编：
+
+```asm
+push ebp / mov ebp,esp / push ecx / mov [ebp-4],ecx
+mov  eax,[ebp-4]
+fld  dword [ebp+8]      ; angle
+fsincos                 ; ★ st(0)=sin, st(1)=cos
+fmul dword [ebp+0xC]    ; sin * radius
+fstp dword [eax]        ; self->x
+fmul dword [ebp+0xC]    ; cos * radius
+fstp dword [eax+4]      ; self->y
+```
+
+**这是极坐标→直角坐标转换，`fsincos` 一次算出 sin 和 cos。**
+
+### 本轮新增的穷举（之前只测过版本，这次加了 `/arch`）
+
+| 维度 | 已测 |
+|---|---|
+| 编译器版本 | v141 / v142 / v143（之前）|
+| **`/arch`** | **(默认) / IA32 / SSE / SSE2 / AVX（本轮）** |
+| 优化级 | `/Od` `/O1` `/O2` `/Ox` `/Os` |
+| 源码形态 | `sinf(a)*r` + `cosf(a)*r`、中间变量、double 版 |
+
+**25 种组合，全部不生成 `d9fb`。**
+
+### 新证据：CRT 库里确实有 `fsincos`
+
+```
+libcmt.lib 里 33 处 d9fb
+符号表里有 ___libm_sse2_sincos_ / ___libm_sse2_sincosf_ / ___libm_sse2_sincosf4_
+```
+
+但它们是 **SSE2 实现**（用 xmm 寄存器 + 多项式逼近），不是 x87 `fsincos`。
+显式声明 `__libm_sse2_sincosf_` 并调用，生成的仍是 `call` + `fmov`，不是 `d9fb`。
+
+### 结论
+
+**`fsincos` 是 x87 指令，MSVC 前端从不主动生成它。**
+
+原版那 32 字节只能是以下之一：
+
+| 可能 | 评价 |
+|---|---|
+| 手写内联汇编 `_asm { fsincos }` | 最可能，但那是汇编不是 C++ |
+| 更老的编译器（VC6 / VS2003 的 x87 数学库）| 与已确认的 v142 Rich Header 矛盾 |
+| 手工编写的 x87 汇编 stub | 同第一条 |
+
+### 处置
+
+**保持 unmatched，不硬凑。**
+
+这 19 个函数占 P1 分母的 8.8%（19/216），是当前最大的单一失败类别。
+但它们**不影响** G1/G3/G4/G2+ 的判定，只影响 P1 的完成度。
+
+如果将来确认原版用了内联汇编，正确做法是在 `src/` 里写 `__asm` 块 ——
+但那属于「用汇编写 C++」，需要在 AGENTS.md 层面裁决是否允许。
