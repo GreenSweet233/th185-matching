@@ -678,50 +678,49 @@ c3           ret
 **遇到这种，直接跳过，不要试写法。**
 ---
 
-## U12：`float` 返回值走 `xmm0` 而非 `st(0)`（2026-11-25）
+## U12：`float` 返回值走 `xmm0` —— 根因是 `__vectorcall`（2026-11-25）
 
 ### 现象
 
 `0x00405930`（49 字节）结尾：
 
 ```asm
-movss xmm0, dword ptr [ecx + 0x5c4]
-ret
-```
-
-**`float` 返回值放在 `xmm0`，不是 `st(0)`（x87）。**
-
-我们生成：
-
-```asm
-d981 c4050000        fld  dword ptr [ecx+0x5c4]
+f30f1081 c4050000    movss  xmm0, dword ptr [ecx+0x5c4]
 c3                   ret
 ```
 
-### 已试的组合
+**`float` 返回值在 `xmm0`，不是 x87 `st(0)`。**
 
-| 写法 | 优化级 | 长度 | 结果 |
+### ★★ 根因：`__vectorcall`
+
+| 调用约定 | 优化级 | 长度 | 返回指令 |
 |---|---|---:|---|
-| `float resolve()` | `/O2` `/O1` | 47/39 | `fld` |
-| 加 `/fp:fast` | `/O2` | 47 | `fld` |
-| 加 `/arch:SSE` / `/arch:SSE2` | `/O2` | 47 | `fld` |
-| `/fp:fast /arch:SSE2` | `/O2` | 47 | `fld` |
-| 返回 `__m128` | `/O2` `/O1` | 58/53 | 要 sret 指针，多 9 字节 |
+| `__fastcall` | `/O2` | 47 | `d981...` = `fld`（x87）|
+| `__cdecl` | `/O2` | 48 | `fld` |
+| **`__vectorcall`** | **`/O2`** | **49 ★** | **`f30f1081` = `movss xmm0`** |
 
-### 分析
+**MSVC 32 位的 `float` 返回值默认走 x87；只有 `__vectorcall` 会走 `xmm0`。**
 
-**MSVC 32 位（x86）的 `float` 返回值约定固定是 x87 `st(0)`。**
+这也解释了为什么 `/fp:fast`、`/arch:SSE`、`/arch:SSE2` 全都不起作用 ——
+它们只影响中间计算和参数传递，**不影响返回值约定**。
 
-- `/arch:SSE*` 只影响**参数传递**和**中间计算**，不影响返回值约定
-- 返回 `__m128` 会触发 sret（隐藏指针），字节对不上
+### 当前还差的 1 处
 
-### 可能的原因
+```
+targ: 8bc8 8b81bc050000 85c0 75e8
+ours: 8bc8 8b80bc050000 85c0 75e8
+            ^^ 8b81 = mov eax,[ecx+0x5bc]
+            ^^ 8b80 = mov eax,[eax+0x5bc]
+```
 
-1. 原版该函数**返回 `__m128`**，但调用方 ABI 与我们的测试不同（比如整个 TU 用 `/arch:SSE2` + 特殊约定）
-2. 或者这**不是函数结尾** —— `movss` 之后可能还有别的（但确实是 `c3`）
-3. 或者原版用了 `__vectorcall`（MSVC 2019+ 支持）
+`mov ecx,eax` 之后 `ecx == eax`，两种编码功能完全等价 ——
+**这是纯寄存器分配差异**（归入 U6/U8/U11 大类）。
 
-### 处置
+已试 4 种写法（`p=p->link` / `cur` 赋值后读 `cur` / `this` 版本 / `for` 双变量），
+全部生成 `[eax+...]`。
 
-保持 unmatched。后续如果遇到同类（`float` 结果落 `xmm0` + 直接 `ret`），
-优先试 `__vectorcall`。
+### 可复用判据
+
+**目标里如果 `float` 结果落 `xmm0` 且函数是叶子，先试 `__vectorcall`。**
+
+反过来：如果试了 `/fp:fast`、`/arch:SSE*` 都还是 `fld`，那就是调用约定问题，不是浮点模型问题。
