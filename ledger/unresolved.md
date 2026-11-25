@@ -790,3 +790,62 @@ if re.search(r"(?:\+\+\s*\w+|\w+\s*\+\+|\w+\s*\+=\s*1)", body):
 
 **建议（未实施）**：把判据改成「for 的三段式能等价表达该循环」才算 FAIL。
 但这属于改门槛脚本，需批准。
+---
+
+## U14：`cmp eax,imm32`（5 字节）vs `cmp edx,imm32`（6 字节）—— 累加器选择（2026-11-25）
+
+### 现象
+
+`0x00441550`（39 字节）——计数器累加 + 上限截断：
+
+```asm
+b8cdcccccc      mov  eax, 0xCCCCCCCD
+f76508          mul  dword [ebp+8]       ; n / 10 的无符号魔术数
+8b414c          mov  eax, [ecx+0x4c]     ; ★ 先读 counter 到 eax
+c1ea03          shr  edx, 3
+03c2            add  eax, edx            ; ★ eax 作累加器
+baffc99a3b      mov  edx, 0x3B9AC9FF
+3d00ca9a3b      cmp  eax, 0x3B9ACA00     ; ★ 5 字节（短格式）
+0f43c2          cmovae eax, edx
+89414c          mov  [ecx+0x4c], eax
+```
+
+我们生成（38 字节）：
+
+```asm
+b8cdcccccc      mov  eax, 0xCCCCCCCD
+f76508          mul  dword [ebp+8]
+b8ffc99a3b      mov  eax, 0x3B9AC9FF     ; 提前读上限
+c1ea03          shr  edx, 3
+03514c          add  edx, [ecx+0x4c]     ; ★ edx 作累加器
+81fa00ca9a3b    cmp  edx, 0x3B9ACA00     ; ★ 6 字节（长格式）
+0f43d0          cmovae edx, eax
+89514c          mov  [ecx+0x4c], edx
+```
+
+**差 1 字节，全部来自 `cmp eax` vs `cmp edx`。**
+
+### 已试的写法（9 种）
+
+| 写法 | 长度 |
+|---|---:|
+| `stuct C { int counter; }; void add(unsigned n)` + `v = counter + n/10` | 38 |
+| `v = counter; v += n/10` | 38 |
+| `unsigned v` / `unsigned counter` | 38 |
+| `counter += n/10` | 40 |
+| 三目 `v >= 1e9 ? 999999999 : v` | 38 |
+| `>` 而非 `>=`（34 字节，更短不对）| 34 |
+
+**全部把累加器放 `edx`。**
+
+### 分析
+
+`edx` 是 `mul` 的结果持有者（`mul` 固定用 `edx:eax`）。
+编译器倾向于**复用 `edx` 作累加器**，省一条 `mov`。
+
+目标却把 `counter` 读到 `eax` 再 `add eax, edx` —— 说明原版的源码形态
+让编译器认为 `eax` 是自然选择（可能是用了 `min()` 或不同的运算顺序）。
+
+### 处置
+
+保持 unmatched，记录为 U14（寄存器分配类，与 U6/U8/U11 同源）。
