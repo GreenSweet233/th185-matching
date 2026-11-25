@@ -451,3 +451,66 @@ MSVC 通常把 `push` 放在函数开头。出现在中间说明：
 而 `test dl,1` 变体有 **12 个**（U6，已知不可得）。
 
 **所以整族 14 个都不可得。** 这条路彻底关闭。
+---
+
+## U9：check_bytes.py 的 TU 拼接不覆盖「cpp 全局作用域定义」（2026-11-25）
+
+### 背景
+
+`0x00407F80`（全局表线性搜索，43 字节）**已验证可以精确匹配**：
+
+```
+target: 33d2 b874a34c00 3908 7411 83c044 42 3d90ba4c00 7cf1 b804ba4c00 c3 ...
+ours  : ★MATCH（用「索引循环 + key 在 +4」）
+```
+
+但在 `check_bytes.py` 里跑不通，原因是**它拼 TU 时只带三类前置定义**：
+
+| 来源 | 带什么 |
+|---|---|
+| hpp | `constexpr` / `static const` 行、`extern ` 开头且 `;` 结尾的行 |
+| cpp | 匿名 namespace 块 |
+| cpp | `extern "C"` 单行 |
+
+**cpp 全局作用域的 `struct` 定义和变量定义都不带。**
+
+### 因此形成的三重夹击
+
+| 写法 | 结果 |
+|---|---|
+| struct 在 hpp + extern 在 hpp | extern 被提到最前，struct 被丢弃 → **C4430** |
+| struct 在 cpp 全局 + extern 在 cpp 全局 | 两者都不被带入 → **C4430** |
+| struct + 表定义都在 cpp 匿名 ns | 表无外部引用被当死代码删 → **COFF_ERROR**（.obj 无 .text）|
+| 同上 + `__declspec(noinline)` | 消除死代码，但 `_func_name_after` 的签名解析被 `__declspec(noinline)` 破坏 → **C2059 在 `for`** |
+| 匿名 ns 里写 `extern` | **C7631**「不允许在匿名命名空间内使用 extern」|
+
+### 已验证可用的独立写法（T4/T5 实验）
+
+```
+T4: struct + extern 声明都在全局作用域   -> .text$mn 43 字节 ✓
+T5: struct + 数组定义在匿名 ns + noinline -> .text$mn 43 字节 ✓
+```
+
+**两者都能生成正确字节，但都无法透过 `check_bytes.py` 的 TU 拼接。**
+
+### 结论
+
+这不是源码问题，是**工具能力缺口**。
+
+要解决需要改 `check_bytes.py` 的 prefix 拼装逻辑（例如：hpp 的 `struct` 定义也带进来，
+或 cpp 全局作用域的 struct 也带进来）。**但那属于改门槛脚本，按 §12 我不擅自改。**
+
+### 处置
+
+- `0x00407F80` 暂不纳入 P1（源码已验证可以匹配，但没有验证路径）
+- 已删除 `src/Batch12.cpp` / `include/Batch12.hpp`（避免留下无法验证的代码）
+- **需要人类裁决**：是否允许扩展 `check_bytes.py` 的 TU 拼接条件
+
+### 可复用判据
+
+**「能手工匹配」≠「能进门禁」。**
+
+验证脚本 `tools/try_candidate.py` 能跑通（它自己拼 TU），
+但正式门禁 `check_bytes.py` 的 TU 拼接规则更严格。
+
+遇到这种情况：要么改门禁（需批准），要么放弃这个函数 —— **不要用 try_candidate 的结果冒充 P1 通过**。
