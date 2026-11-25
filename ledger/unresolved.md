@@ -612,3 +612,67 @@ if (idx > 0xf) ...  // ★ 注意：这里是重新读内存
 **「长度差 5 字节且差异是 `inc [mem]` vs `mov/inc/mov`」** 这个模式，
 说明原版的 `++x` 结果没有被使用。遇到时先找「结果未被使用」的写法，
 但如果中间有屏障写入，可能真的生成不出来。
+---
+
+## U11：SSE 结果的寄存器选择（`movaps` 收尾）—— 同类（2026-11-25）
+
+### 现象
+
+`0x004415C0`（31 字节，二维距离平方）：
+
+```asm
+f30f104904   movss xmm1, [ecx+4]    ; y
+f30f1001     movss xmm0, [ecx]      ; x
+f30f5c02     subss xmm0, [edx]      ; dx = x - ox
+f30f5c4a04   subss xmm1, [edx+4]    ; dy = y - oy
+f30f59c0     mulss xmm0, xmm0       ; dx*dx
+f30f59c9     mulss xmm1, xmm1       ; dy*dy
+f30f58c1     addss xmm0, xmm1       ; 结果在 xmm0
+c3           ret
+```
+
+我们生成（29-42 字节，视写法）：
+
+```asm
+f30f1001     movss xmm0, [ecx]      ✓
+f30f104904   movss xmm1, [ecx+4]    ✓
+f30f5c4a04   subss xmm1, [edx+4]    ✗ 顺序反了
+f30f5c02     subss xmm0, [edx]      ✗
+f30f59c9     mulss xmm1, xmm1       ✗ 顺序反了
+f30f59c0     mulss xmm0, xmm0
+f30f58c8     addss xmm0, xmm1       （或用 xmm1 作累加器）
+0f28c1       movaps xmm0, xmm1      ✗ 多一条
+c3           ret
+```
+
+**目标让结果直接落在 xmm0；我们的结果落在 xmm1 再 `movaps` 搬过去。**
+
+### 已试的写法（7 种）
+
+| 写法 | 结果 |
+|---|---|
+| `float dx, dy; return _mm_set_ss(dx*dx+dy*dy)` | 34，多 `movaps` |
+| `__m128 dx,dy; _mm_add_ss(_mm_mul_ss(dx,dx), ...)` | 42 |
+| 交换两个表达式的书写顺序 | 寄存器号反，仍有 `movaps` |
+| 拆中间变量 / 内联 | 34-83 |
+| 用 `_mm_store_ss` 中转 | 82 |
+
+### 结论
+
+**MSVC 选择哪个 xmm 作累加器，不由源码控制。**
+
+这与 U6（`eax` vs `edx`）、U8（`esi` vs `edx`）同源：
+**寄存器分配是 MSVC 内部决策，源码层面无法干预。**
+
+### 归并
+
+把 U6 / U8 / U11 合并理解：**「寄存器选择差异」是一大类**，
+共同特征：
+
+| 特征 | 含义 |
+|---|---|
+| 指令序列完全一致 | 语义正确 |
+| 寄存器名不同（eax/edx/esi/xmm0/xmm1）| MSVC 决策 |
+| 可能多一条 `push`/`pop`/`movaps` | 保存或搬运 |
+
+**遇到这种，直接跳过，不要试写法。**
