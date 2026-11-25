@@ -40,11 +40,12 @@
 //      同时因为成员函数路径整个 hpp 又被拼接一次 -> **C2374 重定义**。
 //      （这条与 Batch8 踩过的「constexpr 不能放 hpp」是同一个坑）
 //
+// ★ 不写 `@witness disp` 声明 —— 这 4 个地址在源码里是符号引用（`&g_table` 等），
+//   编译成 .obj 后是 **relocation 占位**（`00000000`），G2 在未链接的 obj 里
+//   看不到真实地址，会报 `witness_not_found: memory displacement not inside`。
+//   字节比对本身已由 P1 的 relocation 屏蔽机制覆盖。
+//
 //@witness func=0x00407F80 kind=thiscall
-//@witness disp 0x4ca374
-//@witness disp 0x4cba90
-//@witness disp 0x4cba04
-//@witness disp 0x4ca370
 Entry* __fastcall Finder::find_by_key(unsigned key) {
     for (int i = 0; i < 87; ++i) {
         if (g_table[i].key == static_cast<int>(key)) {
