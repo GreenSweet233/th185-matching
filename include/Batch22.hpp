@@ -40,8 +40,12 @@
 
 
 struct AngleBox {
-    float value;   ///< +0x00
+    float value;      ///< +0x00
+    char  unknown_4[0x18];   ///< +0x04..+0x1c
+    float field_1c;   ///< +0x1c
 
-    float __vectorcall normalize(float a);
+    float  __vectorcall normalize(float a);
     float* __vectorcall normalize_store(float unused, float in);
+    void   __vectorcall normalize_to_field(float unused, float in);
+    float* __vectorcall normalize_add_store(float unused, float in);
 };

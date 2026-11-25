@@ -113,3 +113,53 @@ float* __vectorcall AngleBox::normalize_store(float unused, float in) {
     *out = a;
     return out;
 }
+
+//@witness func=0x00429A60 kind=thiscall
+void __vectorcall AngleBox::normalize_to_field(float unused, float in) {
+    (void)unused;
+    int n = 0;
+    float a = in;
+    while (a > kPi) {
+        const int old = n;
+        a -= k2Pi;
+        ++n;
+        if (old > 0x20) {
+            break;
+        }
+    }
+    while (a < kNegPi) {
+        const int old = n;
+        a += k2Pi;
+        ++n;
+        if (old > 0x20) {
+            break;
+        }
+    }
+    field_1c = a;
+}
+
+//@witness func=0x00404AB0 kind=thiscall
+float* __vectorcall AngleBox::normalize_add_store(float unused, float in) {
+    (void)unused;
+    float* const p = &value;
+    int n = 0;
+    float a = in + *p;
+    while (a > kPi) {
+        const int old = n;
+        a -= k2Pi;
+        ++n;
+        if (old > 0x20) {
+            break;
+        }
+    }
+    while (a < kNegPi) {
+        const int old = n;
+        a += k2Pi;
+        ++n;
+        if (old > 0x20) {
+            break;
+        }
+    }
+    *p = a;
+    return p;
+}
