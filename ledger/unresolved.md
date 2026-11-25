@@ -1100,3 +1100,76 @@ c3              ret
 | `fldcw` / `fprem` / `fnstsw` / `sahf` | x87 控制流，C 不生成 |
 | `shld` / `shrd` | 64 位移位，MSVC 只调库不内联 |
 | 函数体只有 20-35 字节但功能复杂 | 手写优化 |
+---
+
+## U19：含 `call` 的短函数 —— 三类都不可得（2026-11-25）
+
+### 背景
+
+短函数区间（5-45 字节）穷尽后，转向「含 `call` 的短函数」（<= 60 字节，共 79 个）。
+按「去掉 rel32 后的形状」分组，找到 6 组重复：
+
+| 数量 | 长度 | 例 |
+|---:|---:|---|
+| **9** | 16 | `0x0049DC7C`（`mov eax,[ebp+0x10]; push [eax]; call; pop ecx; ret`）|
+| 3 | 27 | `0x00404B90`（`cvtss2sd / call / cvtsd2ss`）|
+| 3 | 35 | `0x004944E7` |
+| 3 | 19 | `0x0049E6ED` |
+| 2 | 36 | `0x0049CF87` |
+| 2 | 41 | `0x0049CFBF` |
+
+### 三类结果
+
+#### 1. 「9 个 16 字节」组 —— 函数片段，不是完整函数
+
+```asm
+8b4510          mov  eax, [ebp+0x10]     ; ★ 读 [ebp+...] 但没有 push ebp
+ff30            push dword [eax]
+e8 ad480000     call 0x4A2533
+59              pop  ecx
+c3              ret
+```
+
+**没有 `push ebp` / `mov ebp,esp` 却读 `[ebp+0x10]`** —— 说明这是
+`function_extent()` 从某个 `call` 目标回溯时**截取到的函数中段**，不是函数起点。
+
+试了 3 种 C 写法（自由函数 / cdecl 3 参 / 成员函数），长度 16-20，都自带 prologue。
+
+#### 2. 「3 个 27 字节」组 —— CRT 浮点辅助
+
+```asm
+558bec          push ebp / mov ebp,esp
+83e4f8          and  esp, 0xFFFFFFF8     ; ★ 对齐到 8 字节
+f30f5ac0        cvtss2sd xmm0, xmm0
+e8 71170a00     call 0x4ABD10            ; CRT 内部 double 例程
+f20f5ac0        cvtsd2ss xmm0, xmm0
+8be55d          mov  esp,ebp / pop ebp
+c3              ret
+```
+
+这是 `_ftol2` 类浮点取整辅助，`and esp,-8` 是 CRT 特有（保证 SSE 对齐）。
+C 的 `(float)(double)x` 生成 14-16 字节的 x87 版本（`fld/fst`），完全不同。
+
+#### 3. 其余 4 组
+
+形状类似：短小的 `call` 包装 + 错误处理（`mov dword [eax], 0x16` = 设置 errno）。
+同样带 CRT 特有的栈对齐或 errno 操作。
+
+### 结论
+
+**含 `call` 的短函数里，能匹配的基本都已匹配**（`0x0048F711` 等）。
+剩下的三类：
+
+1. **函数片段**（被 `function_extent` 误判）—— 应该从 G2 目标集里剔除，而不是硬匹配
+2. **CRT 手写辅助**（`and esp,-8` / errno）—— C 写不出
+3. 其余同类
+
+### 新增判据
+
+**含 `call` 且长度 < 40 的函数，先检查是否：**
+
+| 特征 | 结论 |
+|---|---|
+| 无 `push ebp` 却读 `[ebp+...]` | **函数片段**，应从目标集剔除 |
+| `and esp,0xFFFFFFF8` | CRT 栈对齐，C 写不出 |
+| `mov dword [eax], 0x16` | errno 赋值，CRT 内部 |
