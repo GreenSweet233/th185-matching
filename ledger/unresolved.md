@@ -383,3 +383,71 @@ target:  558bec 51        push ebp / mov ebp,esp / push ecx
 3. **调用约定**：`__fastcall` / 成员函数 / `__cdecl` / `__stdcall`
 4. **聚合 vs 逐字段**（整体赋值触发不同寄存器）
 5. 都失败就如实登记，**不要硬凑**
+---
+
+## U8：`push esi` / `pop esi` —— 中间寄存器保存（2026-11-25）
+
+### 现象
+
+`0x00405A90` / `0x00405AD0`（2 个）的完整反汇编：
+
+```asm
+push ebp
+mov  ebp, esp
+mov  eax, [ecx+0x10]      ; flag
+push esi                  ; ★ 保存 esi
+test al, 1
+jne  skip
+or   eax, 1
+mov  [ecx+4], 0
+mov  [ecx+8], 0
+mov  [ecx+0xc], 0
+mov  [ecx+0x10], eax
+skip:
+mov  eax, [ebp+8]         ; v
+mov  [ecx+4], eax
+pop  esi                  ; ★ 恢复 esi
+movd xmm0, eax
+dec  eax
+cvtdq2ps xmm0, xmm0
+mov  [ecx], eax           ; c2 = v - 1
+movss [ecx+8], xmm0       ; d = (float)v
+pop  ebp
+ret  4
+```
+
+**语义完全清楚**：`if(!(flag&1)){flag|=1;e=0;d=0;c=0;} e=v; c2=v-1; d=(float)v;`
+
+### 但生成不出来
+
+| 写法 | `/O2` | `/O1` | 目标 |
+|---|---:|---:|---:|
+| 完整语义 | 52 | 49 | **64** |
+| `d` 用 int 写 0 | 52 | 49 | 64 |
+| clear 顺序改为 e,d,c | 48 | 45 | 64 |
+
+**我们生成的反而更短**（52 vs 64）。差距在 `push esi` / `pop esi`（2 字节）
+和它附近的指令调度。
+
+### 为什么难
+
+`push esi` 出现在 `mov eax,[ecx+0x10]` **之后** —— 这个位置不符合任何常见模式。
+MSVC 通常把 `push` 放在函数开头。出现在中间说明：
+
+1. 该函数**返回结构体**（`esi` 用于隐藏的返回指针）— 但目标用 `eax` 返回值
+2. 或原版源码里有一个**用到 `esi` 的中间表达式**，被 MSVC 分配了 `esi`
+3. 或这是**函数内联后的残留** —— 原版某个被内联的小函数用了 `esi`
+
+**第 3 条最可能**：这说明这个「函数」在原版里可能不是独立的，
+而是某个更大函数的一部分，或者是内联展开的产物。
+
+### 处置
+
+**保持 unmatched。** 2 个函数，占 P1 分母约 0.9%。
+
+### 该族的更大影响
+
+`test al,1` 这个变体（我们能生成的那种）**只有这 2 个**，
+而 `test dl,1` 变体有 **12 个**（U6，已知不可得）。
+
+**所以整族 14 个都不可得。** 这条路彻底关闭。
